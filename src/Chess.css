@@ -1,0 +1,104 @@
+.chess-piece {
+    position: relative;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%,
+            var(--color-light) 0%,
+            var(--color-main) 40%,
+            var(--color-dark) 100%);
+    border: 3px solid #1f2937;
+    box-shadow:
+        0 6px 12px rgba(0, 0, 0, 0.3),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.2),
+        inset 0 3px 6px rgba(255, 255, 255, 0.2);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    z-index: 10;
+}
+
+/* 高光點 */
+.chess-piece::before {
+    content: "";
+    position: absolute;
+    top: 15%;
+    left: 20%;
+    width: 35%;
+    height: 35%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+/* 內部閃光動畫（可選） */
+.shine {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 50%;
+    height: 200%;
+    background: linear-gradient(120deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.3) 50%,
+            transparent 100%);
+    transform: rotate(30deg);
+    transition: transform 0.6s ease;
+    opacity: 0;
+}
+
+.chess-piece:hover .shine {
+    opacity: 1;
+    transform: rotate(30deg) translateX(150%);
+    transition: transform 0.6s ease;
+}
+
+/* 尺寸 */
+.chess-piece.small {
+    width: 28px;
+    height: 28px;
+}
+
+.chess-piece.medium {
+    width: 40px;
+    height: 40px;
+}
+
+.chess-piece.large {
+    width: 54px;
+    height: 54px;
+}
+
+.chess-piece:hover {
+    transform: translateY(-6px) scale(1.05);
+    box-shadow:
+        0 12px 20px rgba(0, 0, 0, 0.35),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.2),
+        inset 0 3px 6px rgba(255, 255, 255, 0.3);
+}
+
+/* 選中狀態 */
+.chess-piece.selected {
+    transform: scale(1.25) translateY(-8px);
+    box-shadow:
+        0 0 0 5px rgba(255, 255, 255, 0.9),
+        0 0 0 8px var(--color-main),
+        0 16px 28px rgba(0, 0, 0, 0.4);
+    z-index: 30;
+    animation: pulse 1.5s infinite;
+}
+
+/* 堆疊狀態（多個棋子疊在一起） */
+.chess-piece.stacked {
+    z-index: auto;
+}
+
+/* 脈動動畫 */
+@keyframes pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.9), 0 0 0 8px var(--color-main), 0 16px 28px rgba(0, 0, 0, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 0 7px rgba(255, 255, 255, 0.7), 0 0 0 12px var(--color-main), 0 20px 32px rgba(0, 0, 0, 0.5);
+    }
+}
