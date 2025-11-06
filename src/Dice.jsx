@@ -1,23 +1,27 @@
 import { useState } from "react";
 import "./Dice.css";
 
-const Dice = () => {
-  const [value, setValue] = useState(6);
+// Dice.jsx
+const Dice = ({ onRoll, disabled = false }) => {
+  const [value, setValue] = useState(1);
   const [isRolling, setIsRolling] = useState(false);
 
   const roll = () => {
-    if (isRolling) return;
+    if (isRolling || disabled) return;
 
     setIsRolling(true);
+    setValue(null);
 
     const interval = setInterval(() => {
       setValue(Math.floor(Math.random() * 6) + 1);
-    }, 100);
+    }, 80);
 
     setTimeout(() => {
       clearInterval(interval);
-      setValue(Math.floor(Math.random() * 6) + 1);
+      const finalValue = Math.floor(Math.random() * 6) + 1;
+      setValue(finalValue);
       setIsRolling(false);
+      onRoll(finalValue); // 關鍵：通知父組件
     }, 1000);
   };
 
