@@ -1,0 +1,77 @@
+/* 當前玩家區域 */
+.current-player-section {
+    text-align: center;
+}
+
+.current-player-display {
+    padding: 20px;
+    border-radius: 12px;
+    background: #f8f9fa;
+    border: 3px solid #dee2e6;
+    transition: all 0.3s ease;
+}
+
+.current-player-display.red {
+    background: #ffe6e6;
+    border-color: #dc3545;
+}
+
+.current-player-display.yellow {
+    background: #fff9e6;
+    border-color: #e6a700;
+}
+
+.current-player-display.green {
+    background: #e6ffe6;
+    border-color: #28a745;
+}
+
+.current-player-display.blue {
+    background: #e6f3ff;
+    border-color: #007bff;
+}
+
+.current-player-display h2 {
+    margin: 0 0 10px 0;
+    color: #495057;
+    font-size: 18px;
+}
+
+.player-name-large {
+    font-size: 28px;
+    font-weight: bold;
+    margin: 10px 0;
+    text-transform: capitalize;
+}
+
+.player-turn-indicator {
+    color: #6c757d;
+    font-size: 14px;
+    margin-top: 8px;
+}
+
+.victory-message {
+    padding: 16px;
+    background: linear-gradient(135deg, #ffd700, #ffed4e);
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 20px;
+    color: #8b6914;
+    animation: pulse 1.5s infinite;
+    border: 2px solid #ffc107;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}

@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import "./Board.css";
 import Chess from "./Chess";
 import Dice from "./Dice";
+import CurrentPlayerDisplay from "./CurrentPlayerDisplay";
+import PlayerStatusGrid from "./PlayerStatusGrid";
+import ActionLog from "./ActionLog";
 
 // =============================================================================
 // 【飛行棋遊戲完整註解版】- 新手友好說明
@@ -278,9 +281,13 @@ const GameUtils = {
 const Board = () => {
   // 🎲 骰子相關狀態
   const diceValue = useRef(0); // 使用 ref 避免不必要的重渲染
+  const [isDiceDisabled, setIsDiceDisabled] = useState(false);
 
   // ✨ 高亮顯示相關狀態
   const [highlightedChessIds, setHighlightedChessIds] = useState(new Set());
+
+  // 📝 玩家資訊記錄
+  const [playerLog, setPlayerLog] = useState([]);
 
   // 🎮 遊戲核心狀態
   const [gameState, setGameState] = useState({
@@ -289,10 +296,10 @@ const Board = () => {
     players: {
       // 每位玩家的4架飛機狀態
       red: [
-        { id: "red-0", state: "home", position: 0 }, // state: home|path|goal-path|goal
+        { id: "red-0", state: "home", position: 0 },
         { id: "red-1", state: "home", position: 1 },
         { id: "red-2", state: "home", position: 2 },
-        { id: "red-3", state: "home", position: 3 }, // 測試用：預先放一架在通道
+        { id: "red-3", state: "home", position: 3 },
       ],
       blue: [
         { id: "blue-0", state: "home", position: 4 },
@@ -315,6 +322,34 @@ const Board = () => {
     },
   });
 
+  /**
+   * 🧹 換玩家時清除高亮顯示
+   * 為什麼要用 useEffect？ → 確保在 currentPlayer 變化後立即執行
+   */
+  useEffect(() => {
+    setHighlightedChessIds(new Set());
+    setIsDiceDisabled(false);
+  }, [gameState.currentPlayer]);
+
+  // ===========================================================================
+  // 玩家資訊記錄函數
+  // ===========================================================================
+
+  /**
+   * 📝 添加玩家行動記錄
+   */
+
+  const logId = useRef(0);
+  const addLog = (message, type = "info") => {
+    const newLog = {
+      id: logId.current++,
+      message,
+      type,
+      timestamp: new Date().toLocaleTimeString(),
+    };
+    setPlayerLog((prev) => [newLog, ...prev]);
+  };
+
   // ===========================================================================
   // 遊戲核心邏輯函數
   // ===========================================================================
@@ -324,14 +359,6 @@ const Board = () => {
    * 為什麼要這樣計算？ → 4位玩家循環，到最後一位後回到第一位
    */
   const getNextPlayer = (currentPlayer) => (currentPlayer + 1) % GAME_CONFIG.PLAYER_COLORS.length;
-
-  /**
-   * 🧹 換玩家時清除高亮顯示
-   * 為什麼要用 useEffect？ → 確保在 currentPlayer 變化後立即執行
-   */
-  useEffect(() => {
-    setHighlightedChessIds(new Set());
-  }, [gameState.currentPlayer]);
 
   /**
    * 🎲 處理骰子擲出結果
@@ -345,8 +372,16 @@ const Board = () => {
     // 🔢 更新連續6的計數
     const newConsecutiveSixCount = diceResult === GAME_CONFIG.DICE_REQUIRED_FOR_TAKEOFF ? gameState.consecutiveSixCount + 1 : 0;
 
+    // 禁用骰子直到玩家完成移動
+    setIsDiceDisabled(true);
+
+    // 記錄骰子結果
+    addLog(`🎲 ${playerColor} 玩家擲出 ${diceResult} 點`, "roll");
+
     // ⚠️ 連續三次6的處罰：所有在跑道上的飛機回家
     if (newConsecutiveSixCount === GAME_CONFIG.MAX_CONSECUTIVE_SIXES) {
+      addLog(`⚡ ${playerColor} 玩家連續三次擲出 6！所有飛機返回基地！`, "penalty");
+
       const updatedPlayers = { ...gameState.players };
       updatedPlayers[playerColor] = playerChess.map((chess, index) => ({
         ...chess,
@@ -377,6 +412,7 @@ const Board = () => {
 
     // 🚫 沒有可移動的棋子 → 直接換下家
     if (movableChessIds.length === 0) {
+      addLog(`❌ ${playerColor} 玩家沒有可以移動的飛機`, "info");
       setGameState((prev) => ({
         ...prev,
         currentPlayer: getNextPlayer(prev.currentPlayer),
@@ -391,6 +427,9 @@ const Board = () => {
       ...prev,
       consecutiveSixCount: newConsecutiveSixCount,
     }));
+
+    // 提示可以移動的飛機數量
+    addLog(`✅ ${playerColor} 玩家有 ${movableChessIds.length} 架飛機可以移動`, "info");
   };
 
   /**
@@ -499,6 +538,40 @@ const Board = () => {
   };
 
   /**
+   * 🔍 更新所有疊棋的位置和狀態
+   **/
+  const updateStackedChess = (players, targetChess, newPosition, newState) => {
+    const updatedPlayers = { ...players };
+
+    // 找出所有相同位置、相同狀態的同色疊棋
+    const stackedChess = findStackedChess(updatedPlayers, targetChess);
+
+    // 更新所有疊棋的位置和狀態
+    const allChessToUpdate = [targetChess, ...stackedChess];
+
+    allChessToUpdate.forEach((chess) => {
+      const [playerColor, chessIndex] = chess.id.split("-");
+      updatedPlayers[playerColor][parseInt(chessIndex)].position = newPosition;
+      updatedPlayers[playerColor][parseInt(chessIndex)].state = newState;
+    });
+
+    return updatedPlayers;
+  };
+
+  /**
+   * 🔍 找出相同位置的同色棋子
+   */
+  const findStackedChess = (players, targetChess) => {
+    const { id, position, state } = targetChess;
+    const [playerColor] = id.split("-");
+
+    if (!players[playerColor]) return [];
+
+    // 找出所有相同位置、相同狀態的同色棋子（除了自己）
+    return players[playerColor].filter((chess) => chess.id !== id && chess.position === position && chess.state === state);
+  };
+
+  /**
    * 🎯 處理棋子點擊
    * 當玩家點擊高亮的棋子時執行移動
    */
@@ -516,6 +589,8 @@ const Board = () => {
     // 🛫 情況1：在家且擲到6 → 起飛
     if (chess.state === "home" && diceValue.current === GAME_CONFIG.DICE_REQUIRED_FOR_TAKEOFF) {
       updatedChess = handleTakeoff(chess, playerColor);
+
+      addLog(`🛫 ${playerColor} 玩家的飛機從基地起飛！`, "move");
     }
 
     // 🛣️ 情況2：在跑道 → 正常移動
@@ -523,6 +598,8 @@ const Board = () => {
       const { newPosition, newState } = handlePathMovement(chess, playerColor, diceValue.current);
       updatedChess.position = newPosition;
       updatedChess.state = newState;
+
+      addLog(`➡️ ${playerColor} 玩家移動 ${diceValue.current} 步`);
     }
 
     // 🏁 情況3：在家門通道 → 精確移動
@@ -530,26 +607,35 @@ const Board = () => {
       const { newPosition, newState } = handleGoalPathMovement(chess, playerColor, diceValue.current);
       updatedChess.position = newPosition;
       updatedChess.state = newState;
+
+      if (newState === "goal") {
+        addLog(`🎉 ${playerColor} 玩家的飛機到達終點！`, "goal");
+      } else {
+        addLog(`🏠 ${playerColor} 玩家在家門通道移動 ${diceValue.current} 步`, "move");
+      }
     }
 
     // 🔄 更新棋子狀態
     players[playerColor][parseInt(chessIndex)] = updatedChess;
 
+    // 🔄 檢查疊棋 → 批量更新所有疊棋
+    const playersAfterStackUpdate = updateStackedChess(players, chess, updatedChess.position, updatedChess.state);
+
     // 👊 檢查是否需要踢掉對手
-    const playersAfterKick = kickOpponents(players, updatedChess.position, playerColor);
+    const playersAfterKick = kickOpponents(playersAfterStackUpdate, updatedChess.position, playerColor);
 
     // 🎮 更新遊戲狀態
     const shouldReroll = diceValue.current === GAME_CONFIG.DICE_REQUIRED_FOR_TAKEOFF;
     setGameState((prev) => ({
       ...prev,
       players: playersAfterKick,
-      // 擲到6可以再擲一次，否則換下家
-      currentPlayer: shouldReroll ? prev.currentPlayer : getNextPlayer(prev.currentPlayer),
+      currentPlayer: shouldReroll ? prev.currentPlayer : getNextPlayer(prev.currentPlayer), // 擲到6可以再擲一次，否則換下家
     }));
 
     // 🧹 重置狀態
     setHighlightedChessIds(new Set());
     diceValue.current = 0;
+    setIsDiceDisabled(false); // 重新啟用骰子
   };
 
   // ===========================================================================
@@ -557,33 +643,39 @@ const Board = () => {
   // ===========================================================================
 
   return (
-    <>
-      {/* 🎲 骰子元件 */}
-      <Dice onRoll={handleDiceRoll} />
-
-      {/* 📝 當前玩家顯示 */}
-      <h1>{GAME_CONFIG.PLAYER_ORDER[gameState.currentPlayer]} player's turn</h1>
-
-      <div className="container">
-        {/* 🏠 玩家家區背景 */}
-        <PlayerBoardSpace color="red" gridArea="1 / 4 / 4 / 1" />
-        <PlayerBoardSpace color="yellow" gridArea="16 / 13 / 13 / 16" />
-        <PlayerBoardSpace color="green" gridArea="1 / 13 / 4 / 16" />
-        <PlayerBoardSpace color="blue" gridArea="16 / 1 / 13 / 4" />
-
-        {/* 🗺️ 棋盤格子 */}
-        {Object.values(PATH_MAP)
-          .filter((cell) => ["home", "path", "start", "goal-entry", "goal", "goal-path"].includes(cell.type))
-          .map((cell) => (
-            <Cell key={`cell-${cell.x}-${cell.y}`} color={cell.color} x={cell.x} y={cell.y} />
-          ))}
-
-        {/* ✈️ 棋子 */}
-        {Object.entries(gameState.players).map(([color, chessList]) =>
-          chessList.map((chess) => <ChessPiece key={chess.id} chess={chess} color={color} isHighlighted={highlightedChessIds.has(chess.id)} onChessClick={handleChessClick} />)
-        )}
+    <div className="game-container">
+      {/* 骰子和玩家資訊面板 */}
+      <div className="game-controls">
+        <Dice onRoll={handleDiceRoll} disabled={isDiceDisabled} />
+        <CurrentPlayerDisplay currentPlayer={gameState.currentPlayer} players={gameState.players} gameConfig={GAME_CONFIG} />
+        <PlayerStatusGrid currentPlayer={gameState.currentPlayer} players={gameState.players} gameConfig={GAME_CONFIG} />
       </div>
-    </>
+
+      {/* 遊戲棋盤 */}
+      <div className="game-board">
+        <div className="container">
+          <PlayerBoardSpace color="red" gridArea="1 / 4 / 4 / 1" />
+          <PlayerBoardSpace color="yellow" gridArea="16 / 13 / 13 / 16" />
+          <PlayerBoardSpace color="green" gridArea="1 / 13 / 4 / 16" />
+          <PlayerBoardSpace color="blue" gridArea="16 / 1 / 13 / 4" />
+
+          {Object.values(PATH_MAP)
+            .filter((cell) => ["home", "path", "start", "goal-entry", "goal", "goal-path"].includes(cell.type))
+            .map((cell) => (
+              <Cell key={`cell-${cell.x}-${cell.y}`} color={cell.color} x={cell.x} y={cell.y} />
+            ))}
+
+          {Object.entries(gameState.players).map(([color, chessList]) =>
+            chessList.map((chess) => <ChessPiece key={chess.id} chess={chess} color={color} isHighlighted={highlightedChessIds.has(chess.id)} onChessClick={handleChessClick} />)
+          )}
+        </div>
+      </div>
+
+      {/* 操作日誌 */}
+      <div className="game-controls" style={{ minWidth: 300 }}>
+        <ActionLog playerLog={playerLog} />
+      </div>
+    </div>
   );
 };
 

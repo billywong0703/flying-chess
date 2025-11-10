@@ -1,10 +1,29 @@
+/* 遊戲主容器 */
+.game-container {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    margin: 0 auto;
+}
+
+.game-controls {
+    min-width: 300px;
+    padding: 20px;
+    border-radius: 12px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    transition: all 0.3s ease;
+}
+
 .container {
     display: grid;
     grid-template-columns: repeat(15, 1fr);
     grid-template-rows: repeat(15, 1fr);
-    background-color: rgb(227, 230, 233);
+    background: #f5f5f5;
     gap: 10px;
     padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
 }
 
 .cell {

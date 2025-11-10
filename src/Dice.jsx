@@ -42,10 +42,6 @@ const Dice = ({ onRoll, disabled = false }) => {
       <button onClick={roll} disabled={isRolling} className="roll-button">
         {isRolling ? "Rolling..." : "Roll Dice"}
       </button>
-
-      <p className="result">
-        You rolled: <strong>{value}</strong>
-      </p>
     </div>
   );
 };
