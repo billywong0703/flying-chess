@@ -5,6 +5,7 @@ import Dice from "./Dice";
 import CurrentPlayerDisplay from "./CurrentPlayerDisplay";
 import PlayerStatusGrid from "./PlayerStatusGrid";
 import ActionLog from "./ActionLog";
+import VictoryScreen from "./VictoryScreen";
 
 // =============================================================================
 // 【飛行棋遊戲完整註解版】- 新手友好說明
@@ -265,12 +266,17 @@ const GameUtils = {
    * 🏠 尋找空的家區位置
    * 用途：當飛機被踢回起點時，需要找一個空的起始位置
    */
-  getFreeHomeSlot: (players, color) => {
+  /**
+   * 🏠 尋找所有空的家區位置
+   * 用途：當飛機被踢回起點時，需要找空的起始位置
+   * 返回：所有空的家區位置陣列
+   */
+  getFreeHomeSlots: (players, color) => {
     const homeSlots = PLAYER_POSITIONS.HOME_BASE_SLOTS[color];
     // 找出已經被佔用的家區位置
     const occupiedSlots = new Set(players[color].filter((chess) => chess.state === "home").map((chess) => chess.position));
-    // 返回第一個空的位置
-    return homeSlots.find((slot) => !occupiedSlots.has(slot));
+    // 返回所有空的位置
+    return homeSlots.filter((slot) => !occupiedSlots.has(slot));
   },
 };
 
@@ -285,6 +291,11 @@ const Board = () => {
 
   // ✨ 高亮顯示相關狀態
   const [highlightedChessIds, setHighlightedChessIds] = useState(new Set());
+
+  // 🏆 勝利相關狀態
+  const [winner, setWinner] = useState(null); // 勝利者顏色
+  const [isGameOver, setIsGameOver] = useState(false); // 遊戲是否結束
+  const [showVictoryScreen, setShowVictoryScreen] = useState(true); // 是否顯示勝利畫面
 
   // 📝 玩家資訊記錄
   const [playerLog, setPlayerLog] = useState([]);
@@ -359,78 +370,6 @@ const Board = () => {
    * 為什麼要這樣計算？ → 4位玩家循環，到最後一位後回到第一位
    */
   const getNextPlayer = (currentPlayer) => (currentPlayer + 1) % GAME_CONFIG.PLAYER_COLORS.length;
-
-  /**
-   * 🎲 處理骰子擲出結果
-   * 這是遊戲的核心流程：判斷哪些棋子可以移動
-   */
-  const handleDiceRoll = (diceResult) => {
-    const playerColor = GAME_CONFIG.PLAYER_ORDER[gameState.currentPlayer];
-    const playerChess = gameState.players[playerColor];
-    diceValue.current = diceResult;
-
-    // 🔢 更新連續6的計數
-    const newConsecutiveSixCount = diceResult === GAME_CONFIG.DICE_REQUIRED_FOR_TAKEOFF ? gameState.consecutiveSixCount + 1 : 0;
-
-    // 禁用骰子直到玩家完成移動
-    setIsDiceDisabled(true);
-
-    // 記錄骰子結果
-    addLog(`🎲 ${playerColor} 玩家擲出 ${diceResult} 點`, "roll");
-
-    // ⚠️ 連續三次6的處罰：所有在跑道上的飛機回家
-    if (newConsecutiveSixCount === GAME_CONFIG.MAX_CONSECUTIVE_SIXES) {
-      addLog(`⚡ ${playerColor} 玩家連續三次擲出 6！所有飛機返回基地！`, "penalty");
-
-      const updatedPlayers = { ...gameState.players };
-      updatedPlayers[playerColor] = playerChess.map((chess, index) => ({
-        ...chess,
-        state: "home", // 狀態改為在家
-        position: PLAYER_POSITIONS.HOME_BASE_SLOTS[playerColor][index], // 回到起始位置
-      }));
-
-      setGameState({
-        players: updatedPlayers,
-        currentPlayer: getNextPlayer(gameState.currentPlayer), // 換下一位玩家
-        consecutiveSixCount: 0, // 重置連續6計數
-      });
-      return;
-    }
-
-    // 🔍 找出可以移動的棋子
-    const movableChessIds = [];
-    for (const chess of playerChess) {
-      // 情況1：在跑道上 → 任何點數都能移動
-      if (chess.state === "path") movableChessIds.push(chess.id);
-
-      // 情況2：在家裡 + 擲到6 → 可以起飛
-      if (chess.state === "home" && diceResult === 6) movableChessIds.push(chess.id);
-
-      // 情況3：在家門通道 → 任何點數都能移動（精確移動到終點）
-      if (chess.state === "goal-path") movableChessIds.push(chess.id);
-    }
-
-    // 🚫 沒有可移動的棋子 → 直接換下家
-    if (movableChessIds.length === 0) {
-      addLog(`❌ ${playerColor} 玩家沒有可以移動的飛機`, "info");
-      setGameState((prev) => ({
-        ...prev,
-        currentPlayer: getNextPlayer(prev.currentPlayer),
-        consecutiveSixCount: 0,
-      }));
-      return;
-    }
-
-    // ✨ 高亮顯示可以移動的棋子
-    setHighlightedChessIds(new Set(movableChessIds));
-    setGameState((prev) => ({
-      ...prev,
-      consecutiveSixCount: newConsecutiveSixCount,
-    }));
-
-    // 提示可以移動的飛機數量
-    addLog(`✅ ${playerColor} 玩家有 ${movableChessIds.length} 架飛機可以移動`, "info");
-  };
 
   /**
    * 🛫 處理飛機起飛
@@ -508,7 +447,7 @@ const Board = () => {
 
   /**
    * 👊 踢掉對手飛機
-   * 當移動到對手位置時，將對手飛機踢回起點
+   * 當移動到對手位置時，將所有對手飛機踢回起點
    */
   const kickOpponents = (players, position, attackerColor) => {
     const updatedPlayers = { ...players };
@@ -517,21 +456,27 @@ const Board = () => {
     GAME_CONFIG.PLAYER_COLORS.forEach((color) => {
       if (color === attackerColor) return; // 跳過自己
 
-      // 找到在相同位置的對手飛機
-      const opponentIndex = updatedPlayers[color].findIndex((chess) => chess.state === "path" && chess.position === position);
+      // 找到在相同位置的所有對手飛機
+      const opponentChessList = updatedPlayers[color].filter((chess) => chess.position === position);
 
-      if (opponentIndex !== -1) {
-        // 找到空的起始位置
-        const freeSlot = GameUtils.getFreeHomeSlot(updatedPlayers, color);
-        if (freeSlot !== undefined) {
-          // 將對手飛機送回起點
-          updatedPlayers[color][opponentIndex] = {
-            ...updatedPlayers[color][opponentIndex],
+      // 取得所有空的家區位置
+      const freeSlots = GameUtils.getFreeHomeSlots(updatedPlayers, color);
+
+      // 處理每個被踢的對手飛機
+      opponentChessList.forEach((opponentChess, index) => {
+        // 更新對手飛機狀態和位置
+        const chessIndex = updatedPlayers[color].findIndex((chess) => chess.id === opponentChess.id);
+        if (chessIndex !== -1) {
+          updatedPlayers[color][chessIndex] = {
+            ...updatedPlayers[color][chessIndex],
             state: "home", // 狀態改為在家
-            position: freeSlot, // 移動到空的起始位置
+            position: freeSlots[index], // 移動到空的家區位置
           };
+
+          // 記錄踢人事件
+          addLog(`👊 ${attackerColor} 玩家踢飛了 ${color} 玩家的飛機！`, "kick");
         }
-      }
+      });
     });
 
     return updatedPlayers;
@@ -572,10 +517,93 @@ const Board = () => {
   };
 
   /**
+   * 🏆 檢查玩家是否獲勝
+   * 勝利條件：所有4架飛機都到達終點（state === "goal"）
+   */
+  const checkWinCondition = (players) => {
+    for (const [color, chessList] of Object.entries(players)) {
+      // 檢查該玩家的所有飛機是否都在終點
+      const allInGoal = chessList.every((chess) => chess.state === "goal");
+
+      if (allInGoal) {
+        return color; // 返回勝利者顏色
+      }
+    }
+    return null; // 沒有勝利者
+  };
+
+  /**
+   * 🏆 處理遊戲勝利
+   * 當有玩家獲勝時，顯示勝利信息並結束遊戲
+   */
+  const handleWin = (winnerColor) => {
+    setWinner(winnerColor);
+    setIsGameOver(true);
+    setShowVictoryScreen(true);
+
+    // 添加勝利記錄
+    addLog(`🎉 ${winnerColor} 玩家獲得了遊戲勝利！`, "victory");
+
+    // 禁用骰子和所有棋子點擊
+    setIsDiceDisabled(true);
+    setHighlightedChessIds(new Set());
+  };
+
+  /**
+   * 🔄 重置遊戲
+   * 將所有狀態恢復到初始值，開始新遊戲
+   */
+  const resetGame = () => {
+    setGameState({
+      currentPlayer: 0,
+      consecutiveSixCount: 0,
+      players: {
+        red: [
+          { id: "red-0", state: "home", position: 0 },
+          { id: "red-1", state: "home", position: 1 },
+          { id: "red-2", state: "home", position: 2 },
+          { id: "red-3", state: "home", position: 3 },
+        ],
+        blue: [
+          { id: "blue-0", state: "home", position: 4 },
+          { id: "blue-1", state: "home", position: 5 },
+          { id: "blue-2", state: "home", position: 6 },
+          { id: "blue-3", state: "home", position: 7 },
+        ],
+        green: [
+          { id: "green-0", state: "home", position: 8 },
+          { id: "green-1", state: "home", position: 9 },
+          { id: "green-2", state: "home", position: 10 },
+          { id: "green-3", state: "home", position: 11 },
+        ],
+        yellow: [
+          { id: "yellow-0", state: "home", position: 12 },
+          { id: "yellow-1", state: "home", position: 13 },
+          { id: "yellow-2", state: "home", position: 14 },
+          { id: "yellow-3", state: "home", position: 15 },
+        ],
+      },
+    });
+
+    setWinner(null);
+    setIsGameOver(false);
+    setShowVictoryScreen(false);
+    setHighlightedChessIds(new Set());
+    setIsDiceDisabled(false);
+    setPlayerLog([]);
+    diceValue.current = 0;
+
+    addLog("🔄 遊戲已重置，開始新遊戲！", "info");
+  };
+
+  /**
    * 🎯 處理棋子點擊
    * 當玩家點擊高亮的棋子時執行移動
    */
   const handleChessClick = (chessId) => {
+    // 如果遊戲已經結束，不處理任何點擊
+    if (isGameOver) return;
+
     // 檢查點擊的棋子是否可移動
     if (!highlightedChessIds.has(chessId)) return;
 
@@ -624,6 +652,12 @@ const Board = () => {
     // 👊 檢查是否需要踢掉對手
     const playersAfterKick = kickOpponents(playersAfterStackUpdate, updatedChess.position, playerColor);
 
+    // 🏆 檢查是否有玩家獲勝
+    const newWinner = checkWinCondition(playersAfterKick);
+    if (newWinner) {
+      handleWin(newWinner);
+    }
+
     // 🎮 更新遊戲狀態
     const shouldReroll = diceValue.current === GAME_CONFIG.DICE_REQUIRED_FOR_TAKEOFF;
     setGameState((prev) => ({
@@ -633,9 +667,81 @@ const Board = () => {
     }));
 
     // 🧹 重置狀態
-    setHighlightedChessIds(new Set());
     diceValue.current = 0;
-    setIsDiceDisabled(false); // 重新啟用骰子
+    setHighlightedChessIds(new Set());
+    setIsDiceDisabled(isGameOver || !shouldReroll); // 如果遊戲結束或不是連續擲骰，禁用骰子
+  };
+
+  /**
+   * 🎲 處理骰子擲出結果
+   * 這是遊戲的核心流程：判斷哪些棋子可以移動
+   */
+  const handleDiceRoll = (diceResult) => {
+    const playerColor = GAME_CONFIG.PLAYER_ORDER[gameState.currentPlayer];
+    const playerChess = gameState.players[playerColor];
+    diceValue.current = diceResult;
+
+    // 🔢 更新連續6的計數
+    const newConsecutiveSixCount = diceResult === GAME_CONFIG.DICE_REQUIRED_FOR_TAKEOFF ? gameState.consecutiveSixCount + 1 : 0;
+
+    // 禁用骰子直到玩家完成移動
+    setIsDiceDisabled(true);
+
+    // 記錄骰子結果
+    addLog(`🎲 ${playerColor} 玩家擲出 ${diceResult} 點`, "roll");
+
+    // ⚠️ 連續三次6的處罰：所有在跑道上的飛機回家
+    if (newConsecutiveSixCount === GAME_CONFIG.MAX_CONSECUTIVE_SIXES) {
+      addLog(`⚡ ${playerColor} 玩家連續三次擲出 6！所有飛機返回基地！`, "penalty");
+
+      const updatedPlayers = { ...gameState.players };
+      updatedPlayers[playerColor] = playerChess.map((chess, index) => ({
+        ...chess,
+        state: "home", // 狀態改為在家
+        position: PLAYER_POSITIONS.HOME_BASE_SLOTS[playerColor][index], // 回到起始位置
+      }));
+
+      setGameState({
+        players: updatedPlayers,
+        currentPlayer: getNextPlayer(gameState.currentPlayer), // 換下一位玩家
+        consecutiveSixCount: 0, // 重置連續6計數
+      });
+      return;
+    }
+
+    // 🔍 找出可以移動的棋子
+    const movableChessIds = [];
+    for (const chess of playerChess) {
+      // 情況1：在跑道上 → 任何點數都能移動
+      if (chess.state === "path") movableChessIds.push(chess.id);
+
+      // 情況2：在家裡 + 擲到6 → 可以起飛
+      if (chess.state === "home" && diceResult === 6) movableChessIds.push(chess.id);
+
+      // 情況3：在家門通道 → 任何點數都能移動（精確移動到終點）
+      if (chess.state === "goal-path") movableChessIds.push(chess.id);
+    }
+
+    // 🚫 沒有可移動的棋子 → 直接換下家
+    if (movableChessIds.length === 0) {
+      addLog(`❌ ${playerColor} 玩家沒有可以移動的飛機`, "info");
+      setGameState((prev) => ({
+        ...prev,
+        currentPlayer: getNextPlayer(prev.currentPlayer),
+        consecutiveSixCount: 0,
+      }));
+      return;
+    }
+
+    // ✨ 高亮顯示可以移動的棋子
+    setHighlightedChessIds(new Set(movableChessIds));
+    setGameState((prev) => ({
+      ...prev,
+      consecutiveSixCount: newConsecutiveSixCount,
+    }));
+
+    // 提示可以移動的飛機數量
+    addLog(`✅ ${playerColor} 玩家有 ${movableChessIds.length} 架飛機可以移動`, "info");
   };
 
   // ===========================================================================
@@ -644,6 +750,9 @@ const Board = () => {
 
   return (
     <div className="game-container">
+      {/* 勝利畫面 */}
+      {showVictoryScreen && <VictoryScreen winner={winner} onRestart={resetGame} />}
+
       {/* 骰子和玩家資訊面板 */}
       <div className="game-controls">
         <Dice onRoll={handleDiceRoll} disabled={isDiceDisabled} />

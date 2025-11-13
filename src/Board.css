@@ -85,6 +85,5 @@
 }
 
 .center.highlight .chess {
-    /* 如果 Chess 組件有自己的樣式，可加強 */
     box-shadow: 0 0 15px 3px rgb(255, 255, 255);
 }
