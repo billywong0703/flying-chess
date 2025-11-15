@@ -15,9 +15,9 @@ class MCTSNode {
     /**
      * ✅ 檢查節點是否完全擴展
      */
-    isFullyExpanded() {
+    isFullyExpanded(getActionsCallback = null) {
         if (this.untriedActions === null) {
-            this.untriedActions = this.getLegalActions();
+            this.untriedActions = getActionsCallback(this.gameState);
         }
         return this.untriedActions.length === 0;
     }
@@ -30,35 +30,12 @@ class MCTSNode {
     }
 
     /**
-     * 📋 獲取當前狀態下的合法動作列表
-     */
-    getLegalActions() {
-        // 如果沒有可移動的棋子，返回空陣列
-        if (!this.gameState._movableChessIds ||
-            this.gameState._movableChessIds.size === 0) {
-            return [];
-        }
-
-        const actions = [];
-        const movableChessIds = Array.from(this.gameState._movableChessIds);
-
-        // 為每個可移動的棋子創建動作
-        for (const chessId of movableChessIds) {
-            actions.push({
-                type: 'move',
-                chessId: chessId
-            });
-        }
-        return actions;
-    }
-
-    /**
      * 🎲 從未嘗試的動作中選擇一個動作
      */
-    selectUntriedAction() {
+    selectUntriedAction(getActionsCallback = null) {
         // 如果未初始化，先獲取合法動作
         if (this.untriedActions === null) {
-            this.untriedActions = this.getLegalActions();
+            this.untriedActions = getActionsCallback(this.gameState);
         }
 
         // 如果沒有未嘗試的動作，返回null

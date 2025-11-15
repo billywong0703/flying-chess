@@ -176,8 +176,10 @@ class FlyingChessEngine {
     /**
      * 處理骰子擲出
      */
-    rollDice(currentState, diceResult) {
-        const playerColor = this.config.PLAYER_ORDER[currentState.currentPlayer];
+    rollDice(state, diceResult) {
+        const currentState = { ...state };
+
+        const playerColor = this.config.PLAYER_ORDER[state.currentPlayer];
         const newConsecutiveSixCount =
             diceResult === this.config.DICE_REQUIRED_FOR_TAKEOFF
                 ? currentState.consecutiveSixCount + 1
@@ -218,12 +220,13 @@ class FlyingChessEngine {
     /**
      * 移動指定棋子
      */
-    moveChess(currentState, chessId) {
+    moveChess(state, chessId) {
+        const currentState = { ...state };
         const [playerColor, chessIndex] = chessId.split("-");
         const chess = currentState.players[playerColor][parseInt(chessIndex)];
         const diceValue = currentState._lastDiceResult;
 
-        let updatedPlayers = { ...currentState.players };
+        let updatedPlayers = currentState.players;
 
         // 執行移動邏輯
         const updatedChess = this._executeMove(chess, playerColor, diceValue);
@@ -258,10 +261,10 @@ class FlyingChessEngine {
             ...currentState,
             players: updatedPlayers,
             currentPlayer: nextPlayer,
-            _movableChessIds: new Set(),
-            _lastDiceResult: 0,
             winner,
             isGameOver,
+            _movableChessIds: new Set(),
+            _lastDiceResult: 0,
             _lastAction: 'move',
             _lastMovedChess: chessId,
         };

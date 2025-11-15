@@ -33,6 +33,10 @@ class GameAI {
     mctsSearch(diceState) {
         const rootNode = new MCTSNode(diceState);
 
+        // 🎯 關鍵：過濾只考慮實際骰子點數的動作
+        rootNode.untriedActions = this.generateActions(diceState)
+            .filter(action => action.dice === diceState._lastDiceResult);
+
         for (let i = 0; i < this.mctsIterations; i++) {
             let node = this.select(rootNode);
 
@@ -51,7 +55,7 @@ class GameAI {
      * 📝 選擇階段 - 選擇要擴展的節點
      */
     select(node) {
-        while (node.isFullyExpanded() && !node.isTerminal()) {
+        while (node.isFullyExpanded(this.generateActions.bind(this)) && !node.isTerminal()) {
             const nextNode = this.getBestChild(node);
             if (!nextNode) {
                 break;
@@ -65,13 +69,17 @@ class GameAI {
      * 🌱 擴展階段 - 擴展新節點
      */
     expand(node) {
-        const action = node.selectUntriedAction();
+        const action = node.selectUntriedAction(this.generateActions.bind(this));
         if (!action) {
             return node;
         }
 
-        // 執行移動動作
-        const nextState = this.gameEngine.moveChess(node.gameState, action.chessId);
+
+        // 🎲 使用動作中的骰子點數
+        const diceState = this.gameEngine.rollDice(node.gameState, action.dice);
+
+        // ♟️ 移動棋子
+        const nextState = this.gameEngine.moveChess(diceState, action.chessId);
 
         return node.addChild(nextState, action);
     }
@@ -82,7 +90,7 @@ class GameAI {
     simulate(node) {
         let state = this.cloneState(node.gameState);
         let depth = 0;
-        const maxDepth = 50;
+        const maxDepth = 200;
 
         while (!state.isGameOver && depth < maxDepth) {
             // 在模擬中，每一步都需要先擲骰子
@@ -171,8 +179,39 @@ class GameAI {
         for (const chessId of movableChessIds) {
             actions.push({
                 type: 'move',
-                chessId: chessId
+                chessId: chessId,
+                dice: state._lastDiceResult
             });
+        }
+
+        return actions;
+    }
+
+    /**
+     * 🛠️ 動作生成器（依賴注入的核心）
+     */
+    generateActions(gameState) {
+        const actions = [];
+
+        // 考慮所有可能的骰子點數 (1-6)
+        for (let dice = 1; dice <= 6; dice++) {
+            // 模擬擲這個點數的骰子
+            const diceState = this.gameEngine.rollDice(gameState, dice);
+
+            // 如果沒有可移動的棋子，跳過這個骰子點數
+            if (!diceState._movableChessIds || diceState._movableChessIds.size === 0) {
+                continue;
+            }
+
+            // 為每個可移動的棋子創建動作
+            const movableChessIds = Array.from(diceState._movableChessIds);
+            for (const chessId of movableChessIds) {
+                actions.push({
+                    type: 'move',
+                    dice: dice,      // 🎲 骰子點數
+                    chessId: chessId // ♟️ 棋子選擇
+                });
+            }
         }
 
         return actions;
@@ -200,18 +239,6 @@ class GameAI {
         // 完成的飛機獎勵
         const completed = playerChess.filter(chess => chess.state === 'goal').length;
         reward += completed * 0.3;
-
-        // 在終點通道的飛機獎勵
-        const inGoalPath = playerChess.filter(chess => chess.state === 'goal-path').length;
-        reward += inGoalPath * 0.2;
-
-        // 在跑道上的飛機獎勵
-        const onPath = playerChess.filter(chess => chess.state === 'path').length;
-        reward += onPath * 0.1;
-
-        // 在家裡的飛機懲罰
-        const atHome = playerChess.filter(chess => chess.state === 'home').length;
-        reward -= atHome * 0.1;
 
         return Math.max(-1, Math.min(1, reward));
     }
