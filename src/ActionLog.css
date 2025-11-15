@@ -5,7 +5,7 @@
     border-radius: 6px;
     background: white;
     font-size: 12px;
-    max-height: 80vh;
+    max-height: 800px;
 }
 
 .action-log::-webkit-scrollbar {

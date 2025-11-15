@@ -1,45 +1,40 @@
 import { gameEngine } from "./gameEngine";
-import { MCTSNode } from "./NctsNode";
+import MCTSNode from "./MCTSNode";
 
-/**
- * 飛行棋AI主類
- */
+// 修復後的 GameAI 類
 class GameAI {
     constructor(gameEngine) {
         this.gameEngine = gameEngine;
-        this.currentState = null;
         this.mctsIterations = 300;
     }
 
-    startNewGame() {
-        this.currentState = this.gameEngine.createInitialState();
-        return this.currentState;
-    }
+    /**
+     * 🎯 獲取AI的最佳移動決策
+     */
+    getBestMove(currentState) {
+        const state = this.cloneState(currentState);
 
-    playAITurn() {
-        if (this.currentState.isGameOver) {
+        if (state.isGameOver) {
             return null;
         }
 
-        const diceResult = Math.floor(Math.random() * 6) + 1;
-        this.currentState = this.gameEngine.rollDice(this.currentState, diceResult);
-
-        if (this.currentState._movableChessIds.size > 0) {
-            const bestAction = this.mctsSearch(this.currentState);
-            if (bestAction) {
-                this.currentState = this.gameEngine.moveChess(this.currentState, bestAction.chessId);
-            }
+        // 如果沒有可移動的棋子，返回null
+        if (!state._movableChessIds || state._movableChessIds.size === 0) {
+            return null;
         }
 
-        return this.currentState;
+        // 使用MCTS搜索最佳移動
+        return this.mctsSearch(state);
     }
 
-    mctsSearch(currentState) {
-        const rootNode = new MCTSNode(currentState);
+    /**
+     * 🔍 MCTS搜索主函數
+     */
+    mctsSearch(diceState) {
+        const rootNode = new MCTSNode(diceState);
 
         for (let i = 0; i < this.mctsIterations; i++) {
-            let node = rootNode;
-            node = this.select(node);
+            let node = this.select(rootNode);
 
             if (!node.isTerminal()) {
                 node = this.expand(node);
@@ -52,43 +47,73 @@ class GameAI {
         return this.getBestAction(rootNode);
     }
 
+    /**
+     * 📝 選擇階段 - 選擇要擴展的節點
+     */
     select(node) {
         while (node.isFullyExpanded() && !node.isTerminal()) {
-            node = this.getBestChild(node);
+            const nextNode = this.getBestChild(node);
+            if (!nextNode) {
+                break;
+            }
+            node = nextNode;
         }
         return node;
     }
 
+    /**
+     * 🌱 擴展階段 - 擴展新節點
+     */
     expand(node) {
         const action = node.selectUntriedAction();
         if (!action) {
             return node;
         }
 
-        const nextState = this.executeAction(node.gameState, action);
+        // 執行移動動作
+        const nextState = this.gameEngine.moveChess(node.gameState, action.chessId);
+
         return node.addChild(nextState, action);
     }
 
+    /**
+     * 🎲 模擬階段 - 隨機模擬遊戲直到結束
+     */
     simulate(node) {
         let state = this.cloneState(node.gameState);
         let depth = 0;
         const maxDepth = 50;
 
         while (!state.isGameOver && depth < maxDepth) {
-            const actions = this.getLegalActions(state);
+            // 在模擬中，每一步都需要先擲骰子
+            const diceResult = Math.floor(Math.random() * 6) + 1;
+            const diceState = this.gameEngine.rollDice(state, diceResult);
+
+            // 如果沒有可移動的棋子，切換到下一個玩家狀態
+            if (!diceState._movableChessIds || diceState._movableChessIds.size === 0) {
+                state = diceState;
+                depth++;
+                continue;
+            }
+
+            // 隨機選擇一個可移動的棋子
+            const actions = this.getLegalActions(diceState);
             if (actions.length === 0) {
                 break;
             }
 
             const randomIndex = Math.floor(Math.random() * actions.length);
             const randomAction = actions[randomIndex];
-            state = this.executeAction(state, randomAction);
+            state = this.gameEngine.moveChess(diceState, randomAction.chessId);
             depth++;
         }
 
         return this.calculateReward(state, node.gameState.currentPlayer);
     }
 
+    /**
+     * 📊 反向傳播階段 - 更新節點統計信息
+     */
     backpropagate(node, result) {
         while (node !== null) {
             node.update(result);
@@ -97,14 +122,13 @@ class GameAI {
     }
 
     /**
-     * 獲取最佳子節點（基於UCT分數）
+     * 🏆 獲取最佳子節點（基於UCT分數）
      */
     getBestChild(node) {
         let bestChild = null;
         let bestScore = -1;
 
-        for (let i = 0; i < node.children.length; i++) {
-            const child = node.children[i];
+        for (const child of node.children) {
             const score = child.getUCTScore(node.visits);
 
             if (score > bestScore) {
@@ -116,12 +140,14 @@ class GameAI {
         return bestChild;
     }
 
+    /**
+     * 🎯 從根節點獲取最佳動作
+     */
     getBestAction(rootNode) {
         let bestAction = null;
         let bestVisits = -1;
 
-        for (let i = 0; i < rootNode.children.length; i++) {
-            const child = rootNode.children[i];
+        for (const child of rootNode.children) {
             if (child.visits > bestVisits) {
                 bestVisits = child.visits;
                 bestAction = child.action;
@@ -131,60 +157,86 @@ class GameAI {
         return bestAction;
     }
 
-    executeAction(state, action) {
-        return this.gameEngine.moveChess(this.cloneState(state), action.chessId);
-    }
-
-    cloneState(state) {
-        const serialized = this.gameEngine.serializeState(state);
-        return this.gameEngine.deserializeState(serialized);
-    }
-
+    /**
+     * 📋 獲取合法動作列表
+     */
     getLegalActions(state) {
-        if (!state._movableChessIds) {
+        if (!state._movableChessIds || state._movableChessIds.size === 0) {
             return [];
         }
 
         const actions = [];
         const movableChessIds = Array.from(state._movableChessIds);
 
-        for (let i = 0; i < movableChessIds.length; i++) {
+        for (const chessId of movableChessIds) {
             actions.push({
                 type: 'move',
-                chessId: movableChessIds[i]
+                chessId: chessId
             });
         }
 
         return actions;
     }
 
+    /**
+     * 💰 計算獎勵值
+     */
     calculateReward(finalState, originalPlayer) {
         if (finalState.isGameOver) {
             const winnerIndex = this.colorToPlayerIndex(finalState.winner);
             if (winnerIndex === originalPlayer) {
-                return 1;
+                return 1; // 勝利
             } else {
-                return 0;
+                return -1; // 失敗
             }
         }
-        return 0;
+
+        // 計算中間獎勵
+        const playerColor = this.gameEngine.getPlayerColor(originalPlayer);
+        const playerChess = finalState.players[playerColor];
+
+        let reward = 0;
+
+        // 完成的飛機獎勵
+        const completed = playerChess.filter(chess => chess.state === 'goal').length;
+        reward += completed * 0.3;
+
+        // 在終點通道的飛機獎勵
+        const inGoalPath = playerChess.filter(chess => chess.state === 'goal-path').length;
+        reward += inGoalPath * 0.2;
+
+        // 在跑道上的飛機獎勵
+        const onPath = playerChess.filter(chess => chess.state === 'path').length;
+        reward += onPath * 0.1;
+
+        // 在家裡的飛機懲罰
+        const atHome = playerChess.filter(chess => chess.state === 'home').length;
+        reward -= atHome * 0.1;
+
+        return Math.max(-1, Math.min(1, reward));
     }
 
+    /**
+     * 🎨 將顏色轉換為玩家索引
+     */
     colorToPlayerIndex(color) {
-        if (color === 'red') return 0;
-        if (color === 'yellow') return 1;
-        if (color === 'green') return 2;
-        if (color === 'blue') return 3;
-        return 0;
+        const colorMap = { 'red': 0, 'yellow': 1, 'green': 2, 'blue': 3 };
+        return colorMap[color] || 0;
     }
 
+    /**
+     * 🧬 克隆遊戲狀態
+     */
+    cloneState(state) {
+        const serialized = this.gameEngine.serializeState(state);
+        return this.gameEngine.deserializeState(serialized);
+    }
+
+    /**
+     * ⚙️ 設置MCTS迭代次數
+     */
     setIterations(iterations) {
         this.mctsIterations = iterations;
-    }
-
-    printState() {
-        const state = this.currentState;
-        console.log(`玩家: ${state.currentPlayer}, 結束: ${state.isGameOver}, 勝利: ${state.winner || "無"}`);
     }
 }
 

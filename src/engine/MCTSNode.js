@@ -3,15 +3,18 @@
  */
 class MCTSNode {
     constructor(gameState, parent = null, action = null) {
-        this.gameState = gameState;
-        this.parent = parent;
-        this.action = action;
-        this.children = [];
-        this.visits = 0;
-        this.wins = 0;
-        this.untriedActions = null;
+        this.gameState = gameState;      // 🎮 當前遊戲狀態
+        this.parent = parent;            // 👨‍👦 父節點引用
+        this.action = action;            // 🎯 導致此節點的動作
+        this.children = [];              // 🌱 子節點列表
+        this.visits = 0;                 // 📊 節點訪問次數
+        this.wins = 0;                   // 🏆 節點勝利次數/累積獎勵
+        this.untriedActions = null;      // 📦 尚未嘗試的動作列表
     }
 
+    /**
+     * ✅ 檢查節點是否完全擴展
+     */
     isFullyExpanded() {
         if (this.untriedActions === null) {
             this.untriedActions = this.getLegalActions();
@@ -19,11 +22,18 @@ class MCTSNode {
         return this.untriedActions.length === 0;
     }
 
+    /**
+     * 🏁 檢查節點是否為終止狀態（遊戲結束）
+     */
     isTerminal() {
         return this.gameState.isGameOver;
     }
 
+    /**
+     * 📋 獲取當前狀態下的合法動作列表
+     */
     getLegalActions() {
+        // 如果沒有可移動的棋子，返回空陣列
         if (!this.gameState._movableChessIds ||
             this.gameState._movableChessIds.size === 0) {
             return [];
@@ -32,47 +42,67 @@ class MCTSNode {
         const actions = [];
         const movableChessIds = Array.from(this.gameState._movableChessIds);
 
-        for (let i = 0; i < movableChessIds.length; i++) {
+        // 為每個可移動的棋子創建動作
+        for (const chessId of movableChessIds) {
             actions.push({
                 type: 'move',
-                chessId: movableChessIds[i]
+                chessId: chessId
             });
         }
-
         return actions;
     }
 
+    /**
+     * 🎲 從未嘗試的動作中選擇一個動作
+     */
     selectUntriedAction() {
+        // 如果未初始化，先獲取合法動作
         if (this.untriedActions === null) {
             this.untriedActions = this.getLegalActions();
         }
 
+        // 如果沒有未嘗試的動作，返回null
         if (this.untriedActions.length === 0) {
             return null;
         }
 
+        // 從未嘗試動作列表中取出一個動作（後進先出）
         return this.untriedActions.pop();
     }
 
+    /**
+     * 📈 計算UCT（上限置信區間）分數
+     */
     getUCTScore(totalVisits, explorationParam = 1.414) {
+        // 如果節點從未被訪問過，返回最大分數以鼓勵探索
         if (this.visits === 0) {
             return Number.MAX_VALUE;
         }
 
+        // 開發項：當前節點的勝率
         const exploitation = this.wins / this.visits;
+        // 探索項：鼓勵訪問次數較少的節點
         const exploration = explorationParam * Math.sqrt(Math.log(totalVisits) / this.visits);
 
         return exploitation + exploration;
     }
 
+    /**
+     * 👶 添加子節點
+     */
     addChild(gameState, action) {
         const childNode = new MCTSNode(gameState, this, action);
         this.children.push(childNode);
         return childNode;
     }
 
+    /**
+     * 📊 更新節點統計信息
+     */
     update(result) {
-        this.visits += 1;
-        this.wins += result;
+        this.visits += 1;    // 增加訪問次數
+        this.wins += result; // 累積獎勵
     }
 }
+
+export default MCTSNode;

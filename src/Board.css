@@ -8,6 +8,7 @@
 
 .game-controls {
     min-width: 300px;
+    max-width: 914px;
     padding: 20px;
     border-radius: 12px;
     background: #f8f9fa;
