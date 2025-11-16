@@ -177,13 +177,10 @@ class FlyingChessEngine {
      * 處理骰子擲出
      */
     rollDice(state, diceResult) {
-        const currentState = { ...state };
+        const currentState = this.cloneState(state);
 
         const playerColor = this.config.PLAYER_ORDER[state.currentPlayer];
-        const newConsecutiveSixCount =
-            diceResult === this.config.DICE_REQUIRED_FOR_TAKEOFF
-                ? currentState.consecutiveSixCount + 1
-                : 0;
+        const newConsecutiveSixCount = diceResult === this.config.DICE_REQUIRED_FOR_TAKEOFF ? currentState.consecutiveSixCount + 1 : 0;
 
         // 處理連續三次6的處罰
         if (newConsecutiveSixCount === this.config.MAX_CONSECUTIVE_SIXES) {
@@ -221,7 +218,7 @@ class FlyingChessEngine {
      * 移動指定棋子
      */
     moveChess(state, chessId) {
-        const currentState = { ...state };
+        const currentState = this.cloneState(state);
         const [playerColor, chessIndex] = chessId.split("-");
         const chess = currentState.players[playerColor][parseInt(chessIndex)];
         const diceValue = currentState._lastDiceResult;
@@ -269,7 +266,6 @@ class FlyingChessEngine {
             _lastMovedChess: chessId,
         };
     }
-
     /**
      * 檢查移動是否有效
      */
@@ -323,7 +319,7 @@ class FlyingChessEngine {
      * 處理連續三次6的處罰
      */
     _handleThreeSixesPenalty(currentState, playerColor) {
-        const updatedPlayers = { ...currentState.players };
+        const updatedPlayers = this.cloneState(currentState).players;
 
         // 將所有在跑道上的飛機返回基地
         updatedPlayers[playerColor] = updatedPlayers[playerColor].map((chess, index) => {
@@ -342,6 +338,7 @@ class FlyingChessEngine {
             players: updatedPlayers,
             currentPlayer: this._getNextPlayer(currentState.currentPlayer),
             consecutiveSixCount: 0,
+            _lastDiceResult: 6,
             _movableChessIds: new Set(),
             _lastAction: 'penalty',
         };
@@ -637,6 +634,44 @@ class FlyingChessEngine {
     // ===========================================================================
     // 💾 數據持久化
     // ===========================================================================
+    /**
+     * 高效深度拷貝遊戲狀態
+     * 避免 JSON 序列化開銷，精確處理 Set、物件嵌套
+     */
+    cloneState(state) {
+        return {
+            // 基本屬性：直接複製
+            currentPlayer: state.currentPlayer,
+            consecutiveSixCount: state.consecutiveSixCount,
+            winner: state.winner,
+            isGameOver: state.isGameOver,
+
+            // 玩家棋子：深度複製每個玩家
+            players: {
+                red: this._clonePlayerChess(state.players.red),
+                yellow: this._clonePlayerChess(state.players.yellow),
+                green: this._clonePlayerChess(state.players.green),
+                blue: this._clonePlayerChess(state.players.blue),
+            },
+
+            // MCTS 臨時屬性
+            _movableChessIds: state._movableChessIds ? new Set(state._movableChessIds) : new Set(),
+            _lastDiceResult: state._lastDiceResult || 0,
+            _lastAction: state._lastAction,
+            _lastMovedChess: state._lastMovedChess,
+        };
+    }
+
+    /**
+     * 深度複製單一玩家的 4 顆棋子
+     */
+    _clonePlayerChess(chessArray) {
+        return chessArray.map(chess => ({
+            id: chess.id,
+            state: chess.state,
+            position: chess.position,
+        }));
+    }
 
     /**
      * 序列化遊戲狀態

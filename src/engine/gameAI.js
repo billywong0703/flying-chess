@@ -1,11 +1,11 @@
 import { gameEngine } from "./gameEngine";
 import MCTSNode from "./MCTSNode";
 
-// 修復後的 GameAI 類
 class GameAI {
     constructor(gameEngine) {
         this.gameEngine = gameEngine;
-        this.mctsIterations = 300;
+        this.mctsIterations = 500;
+        this.maxDepth = 200;
     }
 
     /**
@@ -34,8 +34,9 @@ class GameAI {
         const rootNode = new MCTSNode(diceState);
 
         // 🎯 關鍵：過濾只考慮實際骰子點數的動作
-        rootNode.untriedActions = this.generateActions(diceState)
-            .filter(action => action.dice === diceState._lastDiceResult);
+        if (diceState._lastDiceResult !== 0) {
+            rootNode.untriedActions = this.getLegalActions(diceState).filter(action => action.dice === diceState._lastDiceResult);
+        }
 
         for (let i = 0; i < this.mctsIterations; i++) {
             let node = this.select(rootNode);
@@ -74,11 +75,12 @@ class GameAI {
             return node;
         }
 
+        let diceState = node.gameState;
 
-        // 🎲 使用動作中的骰子點數
-        const diceState = this.gameEngine.rollDice(node.gameState, action.dice);
+        if (node.gameState._lastDiceResult === 0) {
+            diceState = this.gameEngine.rollDice(node.gameState, action.dice)
+        }
 
-        // ♟️ 移動棋子
         const nextState = this.gameEngine.moveChess(diceState, action.chessId);
 
         return node.addChild(nextState, action);
@@ -90,29 +92,23 @@ class GameAI {
     simulate(node) {
         let state = this.cloneState(node.gameState);
         let depth = 0;
-        const maxDepth = 200;
 
-        while (!state.isGameOver && depth < maxDepth) {
-            // 在模擬中，每一步都需要先擲骰子
-            const diceResult = Math.floor(Math.random() * 6) + 1;
-            const diceState = this.gameEngine.rollDice(state, diceResult);
+        while (!state.isGameOver && depth < this.maxDepth) {
+            // 1. 隨機擲骰子
+            const dice = Math.floor(Math.random() * 6) + 1;
+            const diceState = this.gameEngine.rollDice(state, dice);
 
-            // 如果沒有可移動的棋子，切換到下一個玩家狀態
+            // 2. 檢查是否有可移動棋子
             if (!diceState._movableChessIds || diceState._movableChessIds.size === 0) {
-                state = diceState;
+                state = diceState; // 換玩家
                 depth++;
                 continue;
             }
 
-            // 隨機選擇一個可移動的棋子
-            const actions = this.getLegalActions(diceState);
-            if (actions.length === 0) {
-                break;
-            }
-
-            const randomIndex = Math.floor(Math.random() * actions.length);
-            const randomAction = actions[randomIndex];
-            state = this.gameEngine.moveChess(diceState, randomAction.chessId);
+            // 3. 隨機選擇動作
+            const chessIds = Array.from(diceState._movableChessIds);
+            const chessId = chessIds[Math.floor(Math.random() * chessIds.length)];
+            state = this.gameEngine.moveChess(diceState, chessId);
             depth++;
         }
 
@@ -194,6 +190,7 @@ class GameAI {
         const actions = [];
 
         // 考慮所有可能的骰子點數 (1-6)
+
         for (let dice = 1; dice <= 6; dice++) {
             // 模擬擲這個點數的骰子
             const diceState = this.gameEngine.rollDice(gameState, dice);
@@ -230,17 +227,7 @@ class GameAI {
             }
         }
 
-        // 計算中間獎勵
-        const playerColor = this.gameEngine.getPlayerColor(originalPlayer);
-        const playerChess = finalState.players[playerColor];
-
-        let reward = 0;
-
-        // 完成的飛機獎勵
-        const completed = playerChess.filter(chess => chess.state === 'goal').length;
-        reward += completed * 0.3;
-
-        return Math.max(-1, Math.min(1, reward));
+        return 0;
     }
 
     /**

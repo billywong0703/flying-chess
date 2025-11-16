@@ -75,47 +75,39 @@ const Board = () => {
     // 給AI一點思考時間，讓玩家能看到過程
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    try {
-      // AI擲骰子
-      const diceResult = Math.floor(Math.random() * 6) + 1;
-      addLog(`🎲 ${currentPlayerColor} AI 擲出 ${diceResult} 點`, "roll");
+    // AI擲骰子
+    const diceResult = Math.floor(Math.random() * 6) + 1;
+    addLog(`🎲 ${currentPlayerColor} AI 擲出 ${diceResult} 點`, "roll");
 
-      let newGameState = gameEngine.rollDice(gameState, diceResult);
+    let newGameState = gameEngine.rollDice(gameState, diceResult);
 
-      // 處理擲骰子後的狀態
-      switch (newGameState._lastAction) {
-        case "penalty":
-          addLog(`⚡ ${currentPlayerColor} AI 連續三次擲出 6！所有飛機返回基地！`, "penalty");
-          break;
-        case "no_movable_chess":
-          addLog(`❌ ${currentPlayerColor} AI 沒有可以移動的飛機`, "info");
-          break;
-        default:
-          if (newGameState._movableChessIds && newGameState._movableChessIds.size > 0) {
-            // AI選擇最佳移動
-            const action = gameAI.getBestMove(newGameState, diceResult);
-            if (action) {
-              newGameState = gameEngine.moveChess(newGameState, action.chessId);
+    // 處理擲骰子後的狀態
+    if (newGameState._lastAction === "penalty") {
+      addLog(`⚡ ${currentPlayerColor} AI 連續三次擲出 6！所有飛機返回基地！`, "penalty");
+    }
 
-              const cellInfo = gameEngine.getCellInfo(newGameState.players[currentPlayerColor].find((chess) => chess.id === action.chessId).position);
+    if (newGameState._lastAction === "no_movable_chess") {
+      addLog(`❌ ${currentPlayerColor} AI 沒有可以移動的飛機`, "info");
+    }
 
-              if (cellInfo.type === "goal") {
-                addLog(`🎉 ${currentPlayerColor} AI 的飛機到達終點！`, "goal");
-              } else {
-                addLog(`➡️ ${currentPlayerColor} AI 移動了飛機`, "move");
-              }
-            }
-          }
-          break;
+    if (newGameState._movableChessIds && newGameState._movableChessIds.size > 0) {
+      // AI選擇最佳移動
+      const action = gameAI.getBestMove(newGameState, diceResult);
+      if (action) {
+        newGameState = gameEngine.moveChess(newGameState, action.chessId);
+
+        const cellInfo = gameEngine.getCellInfo(newGameState.players[currentPlayerColor].find((chess) => chess.id === action.chessId).position);
+
+        if (cellInfo.type === "goal") {
+          addLog(`🎉 ${currentPlayerColor} AI 的飛機到達終點！`, "goal");
+        } else {
+          addLog(`➡️ ${currentPlayerColor} AI 移動了飛機`, "move");
+        }
       }
-
-      syncUIWithGameState(newGameState);
-    } catch (error) {
-      console.error("AI回合出錯:", error);
-      addLog(`❌ ${currentPlayerColor} AI 回合出錯`, "error");
     }
 
     setIsAITurn(false);
+    syncUIWithGameState(newGameState);
   };
 
   // ===========================================================================
@@ -174,7 +166,6 @@ const Board = () => {
     syncUIWithGameState(newGameState);
     setPlayerLog([]);
     setShowVictoryScreen(false);
-    setIsAITurn(false);
     addLog("🔄 遊戲已重置，開始新遊戲！", "info");
   };
 
@@ -187,22 +178,14 @@ const Board = () => {
    */
   useEffect(() => {
     if (gameState.isGameOver) return;
-
-    const currentPlayerColor = gameEngine.getPlayerColor(gameState.currentPlayer);
-
-    // 檢查當前玩家是否是AI，且不在移動狀態
-    if (aiPlayers.current[currentPlayerColor] && (!gameState._movableChessIds || gameState._movableChessIds.size === 0) && !isAITurn) {
+    if (aiPlayers.current[gameEngine.getPlayerColor(gameState.currentPlayer)]) {
       setIsAITurn(true);
     }
-  }, [gameState.currentPlayer, gameState._movableChessIds, gameState.isGameOver, isAITurn]);
+  }, [gameState.currentPlayer, gameState.isGameOver, isAITurn]);
 
-  /**
-   * 🔄 處理AI回合
-   */
   useEffect(() => {
-    if (isAITurn) {
-      handleAITurn();
-    }
+    if (!isAITurn) return;
+    handleAITurn();
   }, [isAITurn]);
 
   useEffect(() => {
@@ -254,7 +237,6 @@ const Board = () => {
   );
 };
 
-// 其他輔助元件保持不變，只需在ChessPiece中添加isAITurn檢查
 const ChessPiece = ({ chess, color, isHighlighted, onChessClick, isAITurn }) => {
   const cell = gameEngine.getCellInfo(chess.position);
   if (!cell) return null;
@@ -290,7 +272,6 @@ const ChessPiece = ({ chess, color, isHighlighted, onChessClick, isAITurn }) => 
   );
 };
 
-// Cell 和 PlayerBoardSpace 元件保持不變
 const Cell = ({ color = "", x, y }) => (
   <div className={`cell ${color}`} style={{ gridRow: x, gridColumn: y }}>
     <div className="circle"></div>
