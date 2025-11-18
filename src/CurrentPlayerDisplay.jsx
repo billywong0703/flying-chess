@@ -1,13 +1,13 @@
 import React from "react";
 import "./CurrentPlayerDisplay.css";
 
-const CurrentPlayerDisplay = ({ currentPlayer, players, gameConfig, isAITurn, aiPlayers }) => {
+const CurrentPlayerDisplay = ({ currentPlayer, playersChess, gameConfig, isAITurn, aiPlayers }) => {
   /**
    * 🏆 檢查勝利條件
    */
   const checkWinner = () => {
     for (const color of gameConfig.PLAYER_COLORS) {
-      const player = players[color];
+      const player = playersChess[color];
       const allAtGoal = player.every((chess) => chess.state === "goal");
       if (allAtGoal) {
         return color;

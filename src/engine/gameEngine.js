@@ -1,16 +1,12 @@
-/* eslint-disable no-case-declarations */
-// gameEngine.js
+import { gameRules, GameState } from "./gameRules";
 
 // =============================================================================
 // 遊戲配置和常量
 // =============================================================================
 
 export const GAME_CONFIG = {
-    PLAYER_COLORS: ["red", "yellow", "green", "blue"],
-    PLAYER_ORDER: { 0: "red", 1: "yellow", 2: "green", 3: "blue" },
-    DICE_REQUIRED_FOR_TAKEOFF: 6,
-    MAX_CONSECUTIVE_SIXES: 3,
-    JUMP_STEPS: 4,
+    PLAYER_COLORS: ["red", "blue", "green", "yellow"],
+    PLAYER_ORDER: { 0: "red", 1: "blue", 2: "green", 3: "yellow" },
     RING_START: 16,
     RING_SIZE: 52,
 };
@@ -118,582 +114,132 @@ export const PATH_MAP = {
     91: { x: 9, y: 8, color: "blue", type: "goal", player: "blue" },
 };
 
-export const PLAYER_POSITIONS = {
-    START: {
-        red: 65,
-        yellow: 39,
-        green: 26,
-        blue: 52,
-    },
-    GOAL_ENTRY: {
-        red: 61,
-        blue: 48,
-        green: 22,
-        yellow: 35,
-    },
-    GOAL_PATH_ENTRY: {
-        red: 68,
-        blue: 86,
-        green: 80,
-        yellow: 74,
-    },
-    HOME_BASE_SLOTS: {
-        red: [0, 1, 2, 3],
-        blue: [4, 5, 6, 7],
-        green: [8, 9, 10, 11],
-        yellow: [12, 13, 14, 15],
-    },
-};
-
-// =============================================================================
-// 主遊戲引擎類
-// =============================================================================
-
-class FlyingChessEngine {
-    constructor(GAME_CONFIG, PATH_MAP, PLAYER_POSITIONS) {
-        this.config = GAME_CONFIG;
-        this.pathMap = PATH_MAP;
-        this.playerPositions = PLAYER_POSITIONS;
-    }
-
-    // ===========================================================================
-    // 🎮 公共遊戲API
-    // ===========================================================================
-
-    /**
-     * 創建初始遊戲狀態
-     */
-    createInitialState() {
-        return {
-            currentPlayer: 0,
-            consecutiveSixCount: 0,
-            players: this._initializePlayers(),
-            winner: null,
-            isGameOver: false,
-        };
-    }
-
-    /**
-     * 處理骰子擲出
-     */
-    rollDice(state, diceResult) {
-        const currentState = this.cloneState(state);
-
-        const playerColor = this.config.PLAYER_ORDER[state.currentPlayer];
-        const newConsecutiveSixCount = diceResult === this.config.DICE_REQUIRED_FOR_TAKEOFF ? currentState.consecutiveSixCount + 1 : 0;
-
-        // 處理連續三次6的處罰
-        if (newConsecutiveSixCount === this.config.MAX_CONSECUTIVE_SIXES) {
-            return this._handleThreeSixesPenalty(currentState, playerColor);
-        }
-
-        // 找出可移動的棋子
-        const movableChessIds = this._findMovableChess(
-            currentState.players[playerColor],
-            diceResult
-        );
-
-        // 🆕 如果沒有可移動的棋子，自動轉換到下一玩家
-        if (movableChessIds.size === 0) {
-            return {
-                ...currentState,
-                currentPlayer: this._getNextPlayer(currentState.currentPlayer),
-                consecutiveSixCount: 0, // 重置連續6計數
-                _movableChessIds: movableChessIds,
-                _lastAction: 'no_movable_chess',
-                _lastDiceResult: diceResult,
-            };
-        }
-
-        return {
-            ...currentState,
-            consecutiveSixCount: newConsecutiveSixCount,
-            _movableChessIds: movableChessIds,
-            _lastAction: 'dice_roll',
-            _lastDiceResult: diceResult,
-        };
-    }
-
-    /**
-     * 移動指定棋子
-     */
-    moveChess(state, chessId) {
-        const currentState = this.cloneState(state);
-        const [playerColor, chessIndex] = chessId.split("-");
-        const chess = currentState.players[playerColor][parseInt(chessIndex)];
-        const diceValue = currentState._lastDiceResult;
-
-        let updatedPlayers = currentState.players;
-
-        // 執行移動邏輯
-        const updatedChess = this._executeMove(chess, playerColor, diceValue);
-        updatedPlayers[playerColor][parseInt(chessIndex)] = updatedChess;
-
-        // 處理疊棋
-        updatedPlayers = this._updateStackedChess(
-            updatedPlayers,
-            chess,
-            updatedChess.position,
-            updatedChess.state
-        );
-
-        // 處理踢對手
-        updatedPlayers = this._kickOpponents(
-            updatedPlayers,
-            updatedChess.position,
-            playerColor
-        );
-
-        // 檢查勝利條件
-        const winner = this._checkWinCondition(updatedPlayers);
-        const isGameOver = !!winner;
-
-        // 決定下一位玩家
-        const shouldReroll = diceValue === this.config.DICE_REQUIRED_FOR_TAKEOFF;
-        const nextPlayer = shouldReroll && !isGameOver
-            ? currentState.currentPlayer
-            : this._getNextPlayer(currentState.currentPlayer);
-
-        return {
-            ...currentState,
-            players: updatedPlayers,
-            currentPlayer: nextPlayer,
-            winner,
-            isGameOver,
-            _movableChessIds: new Set(),
-            _lastDiceResult: 0,
-            _lastAction: 'move',
-            _lastMovedChess: chessId,
-        };
-    }
-    /**
-     * 檢查移動是否有效
-     */
-    isValidMove(currentState, chessId) {
-        if (!currentState._movableChessIds) return false;
-        return currentState._movableChessIds.has(chessId);
-    }
-
-    /**
-     * 獲取玩家顏色
-     */
-    getPlayerColor(playerIndex) {
-        return this.config.PLAYER_ORDER[playerIndex];
-    }
-
-    /**
-     * 獲取格子信息
-     */
-    getCellInfo(position) {
-        return this.pathMap[position];
-    }
-
-    // ===========================================================================
-    // 🧠 遊戲狀態管理
-    // ===========================================================================
-
-    /**
-     * 初始化所有玩家和棋子
-     */
-    _initializePlayers() {
-        return {
-            red: this._createPlayerPieces("red", [0, 1, 2, 3]),
-            blue: this._createPlayerPieces("blue", [4, 5, 6, 7]),
-            green: this._createPlayerPieces("green", [8, 9, 10, 11]),
-            yellow: this._createPlayerPieces("yellow", [12, 13, 14, 15]),
-        };
-    }
-
-    /**
-     * 創建玩家棋子
-     */
-    _createPlayerPieces(color, positions) {
-        return positions.map((pos, index) => ({
-            id: `${color}-${index}`,
-            state: "home",
-            position: pos,
-        }));
-    }
-
-    /**
-     * 處理連續三次6的處罰
-     */
-    _handleThreeSixesPenalty(currentState, playerColor) {
-        const updatedPlayers = this.cloneState(currentState).players;
-
-        // 將所有在跑道上的飛機返回基地
-        updatedPlayers[playerColor] = updatedPlayers[playerColor].map((chess, index) => {
-            if (chess.state !== "home") {
-                return {
-                    ...chess,
-                    state: "home",
-                    position: this.playerPositions.HOME_BASE_SLOTS[playerColor][index],
-                };
-            }
-            return chess;
-        });
-
-        return {
-            ...currentState,
-            players: updatedPlayers,
-            currentPlayer: this._getNextPlayer(currentState.currentPlayer),
-            consecutiveSixCount: 0,
-            _lastDiceResult: 6,
-            _movableChessIds: new Set(),
-            _lastAction: 'penalty',
-        };
-    }
-
-    /**
-     * 檢查勝利條件
-     */
-    _checkWinCondition(players) {
-        for (const [color, chessList] of Object.entries(players)) {
-            const allInGoal = chessList.every((chess) => chess.state === "goal");
-            if (allInGoal) {
-                return color;
-            }
-        }
-        return null;
-    }
-
-    // ===========================================================================
-    // 🎲 骰子邏輯
-    // ===========================================================================
-
-    /**
-     * 找出可移動的棋子
-     */
-    _findMovableChess(playerChess, diceResult) {
-        const movableChessIds = [];
-
-        for (const chess of playerChess) {
-            if (chess.state === "path") movableChessIds.push(chess.id);
-            if (chess.state === "home" && diceResult === this.config.DICE_REQUIRED_FOR_TAKEOFF) {
-                movableChessIds.push(chess.id);
-            }
-            if (chess.state === "goal-path") movableChessIds.push(chess.id);
-        }
-
-        return new Set(movableChessIds);
-    }
-
-    // ===========================================================================
-    // 🚀 移動系統
-    // ===========================================================================
-
-    /**
-     * 執行棋子移動
-     */
-    _executeMove(chess, playerColor, diceResult) {
-        let updatedChess = { ...chess };
-
-        switch (chess.state) {
-            case "home":
-                if (diceResult === this.config.DICE_REQUIRED_FOR_TAKEOFF) {
-                    updatedChess = this._handleTakeoff(chess, playerColor);
-                }
-                break;
-
-            case "path":
-                const pathResult = this._handlePathMovement(chess, playerColor, diceResult);
-                updatedChess.position = pathResult.newPosition;
-                updatedChess.state = pathResult.newState;
-                break;
-
-            case "goal-path":
-                const goalResult = this._handleGoalPathMovement(chess, playerColor, diceResult);
-                updatedChess.position = goalResult.newPosition;
-                updatedChess.state = goalResult.newState;
-                break;
-
-            default:
-                break;
-        }
-
-        return updatedChess;
-    }
-
-    /**
-     * 處理起飛
-     */
-    _handleTakeoff(chess, playerColor) {
-        return {
-            ...chess,
-            state: "path",
-            position: this.playerPositions.START[playerColor],
-        };
-    }
-
-    /**
-     * 處理跑道移動
-     */
-    _handlePathMovement(chess, playerColor, diceResult) {
-        let newPosition = this._getNextPathPos(chess.position, diceResult);
-        let newState = "path";
-
-        // 檢查是否經過家門入口
-        if (this._willPassGoalEntry(chess.position, newPosition, playerColor)) {
-            const stepsToEntry = this._getStepsToGoalEntry(
-                chess.position,
-                this.playerPositions.GOAL_ENTRY[playerColor]
-            );
-            const remainingSteps = diceResult - stepsToEntry;
-
-            if (remainingSteps > 0) {
-                newPosition = this.playerPositions.GOAL_PATH_ENTRY[playerColor] + remainingSteps - 1;
-                const goalEnd = this.playerPositions.GOAL_PATH_ENTRY[playerColor] + 5;
-                newState = newPosition >= goalEnd ? "goal" : "goal-path";
-                return { newPosition, newState };
-            }
-        }
-
-        // 跳躍規則：走到自己顏色的格子
-        if (this.pathMap[newPosition] &&
-            this.pathMap[newPosition].color === playerColor &&
-            newPosition !== this.playerPositions.GOAL_ENTRY[playerColor]) {
-            newPosition = this._getNextPathPos(newPosition, this.config.JUMP_STEPS);
-        }
-
-        return { newPosition, newState };
-    }
-
-    /**
-     * 處理家門通道移動
-     */
-    _handleGoalPathMovement(chess, playerColor, diceResult) {
-        const goalPathEntry = this.playerPositions.GOAL_PATH_ENTRY[playerColor];
-        const goalEnd = goalPathEntry + 5;
-        const currentPosition = chess.position;
-
-        const stepsToGoal = goalEnd - currentPosition;
-
-        let newPosition;
-        let newState;
-
-        if (diceResult <= stepsToGoal) {
-            // 正常移動，沒有超過終點
-            newPosition = currentPosition + diceResult;
-            newState = newPosition === goalEnd ? "goal" : "goal-path";
-        } else {
-            // 超過終點，需要後退
-            const overshoot = diceResult - stepsToGoal;
-            newPosition = goalEnd - overshoot;
-            newState = "goal-path";
-
-            // 確保不會後退到家門通道入口之前
-            if (newPosition < goalPathEntry) {
-                newPosition = goalPathEntry;
-            }
-        }
-
-        return { newPosition, newState };
-    }
-
-    // ===========================================================================
-    // ⚡ 互動系統
-    // ===========================================================================
-
-    /**
-     * 踢掉對手棋子
-     */
-    _kickOpponents(players, position, attackerColor) {
-        const updatedPlayers = { ...players };
-
-        this.config.PLAYER_COLORS.forEach((color) => {
-            if (color === attackerColor) return;
-
-            const opponentChessList = updatedPlayers[color].filter(
-                (chess) => chess.position === position && chess.state !== "home" && chess.state !== "goal"
-            );
-
-            const freeSlots = this._getFreeHomeSlots(updatedPlayers, color);
-
-            opponentChessList.forEach((opponentChess, index) => {
-                const chessIndex = updatedPlayers[color].findIndex(
-                    (chess) => chess.id === opponentChess.id
-                );
-
-                if (chessIndex !== -1 && index < freeSlots.length) {
-                    updatedPlayers[color][chessIndex] = {
-                        ...updatedPlayers[color][chessIndex],
-                        state: "home",
-                        position: freeSlots[index],
-                    };
-                }
-            });
-        });
-
-        return updatedPlayers;
-    }
-
-    /**
-     * 處理疊棋移動
-     */
-    _updateStackedChess(players, targetChess, newPosition, newState) {
-        const updatedPlayers = { ...players };
-        const stackedChess = this._findStackedChess(updatedPlayers, targetChess);
-
-        const allChessToUpdate = [targetChess, ...stackedChess];
-
-        allChessToUpdate.forEach((chess) => {
-            const [playerColor, chessIndex] = chess.id.split("-");
-            updatedPlayers[playerColor][parseInt(chessIndex)].position = newPosition;
-            updatedPlayers[playerColor][parseInt(chessIndex)].state = newState;
-        });
-
-        return updatedPlayers;
-    }
-
-    /**
-     * 找出相同位置的疊棋
-     */
-    _findStackedChess(players, targetChess) {
-        const { id, position, state } = targetChess;
-        const [playerColor] = id.split("-");
-
-        if (!players[playerColor]) return [];
-
-        return players[playerColor].filter(
-            (chess) =>
-                chess.id !== id &&
-                chess.position === position &&
-                chess.state === state
-        );
-    }
-
-    // ===========================================================================
-    // 📍 位置計算工具
-    // ===========================================================================
-
-    /**
-     * 計算環形跑道位置
-     */
-    _getNextPathPos(currentPos, steps) {
-        const { RING_START, RING_SIZE } = this.config;
-        const ringIndex = currentPos - RING_START;
-        const newRingIndex = (ringIndex + steps) % RING_SIZE;
-        return RING_START + newRingIndex;
-    }
-
-    /**
-     * 檢查是否經過家門入口
-     */
-    _willPassGoalEntry(currentPos, newPos, playerColor) {
-        const entryPos = this.playerPositions.GOAL_ENTRY[playerColor];
-        const { RING_START } = this.config;
-
-        if (currentPos <= entryPos && newPos >= entryPos) {
-            return true;
-        }
-
-        if (currentPos >= newPos && newPos >= RING_START) {
-            return entryPos >= RING_START && entryPos <= newPos;
-        }
-
-        return false;
-    }
-
-    /**
-     * 計算到入口點的步數
-     */
-    _getStepsToGoalEntry(currentPos, entryPos) {
-        const { RING_START, RING_SIZE } = this.config;
-
-        if (currentPos <= entryPos) {
-            return entryPos - currentPos;
-        } else {
-            return RING_SIZE - currentPos + RING_START + (entryPos - RING_START);
-        }
-    }
-
-    /**
-     * 獲取空的家區位置
-     */
-    _getFreeHomeSlots(players, color) {
-        const homeSlots = this.playerPositions.HOME_BASE_SLOTS[color];
-        const occupiedSlots = new Set(
-            players[color]
-                .filter((chess) => chess.state === "home")
-                .map((chess) => chess.position)
-        );
-        return homeSlots.filter((slot) => !occupiedSlots.has(slot));
-    }
-
-    // ===========================================================================
-    // 🔄 玩家管理
-    // ===========================================================================
-
-    /**
-     * 獲取下一位玩家
-     */
-    _getNextPlayer(currentPlayer) {
-        return (currentPlayer + 1) % this.config.PLAYER_COLORS.length;
-    }
-
-    // ===========================================================================
-    // 💾 數據持久化
-    // ===========================================================================
-    /**
-     * 高效深度拷貝遊戲狀態
-     * 避免 JSON 序列化開銷，精確處理 Set、物件嵌套
-     */
-    cloneState(state) {
-        return {
-            // 基本屬性：直接複製
-            currentPlayer: state.currentPlayer,
-            consecutiveSixCount: state.consecutiveSixCount,
-            winner: state.winner,
-            isGameOver: state.isGameOver,
-
-            // 玩家棋子：深度複製每個玩家
-            players: {
-                red: this._clonePlayerChess(state.players.red),
-                yellow: this._clonePlayerChess(state.players.yellow),
-                green: this._clonePlayerChess(state.players.green),
-                blue: this._clonePlayerChess(state.players.blue),
-            },
-
-            // MCTS 臨時屬性
-            _movableChessIds: state._movableChessIds ? new Set(state._movableChessIds) : new Set(),
-            _lastDiceResult: state._lastDiceResult || 0,
-            _lastAction: state._lastAction,
-            _lastMovedChess: state._lastMovedChess,
-        };
-    }
-
-    /**
-     * 深度複製單一玩家的 4 顆棋子
-     */
-    _clonePlayerChess(chessArray) {
-        return chessArray.map(chess => ({
-            id: chess.id,
-            state: chess.state,
-            position: chess.position,
-        }));
-    }
-
-    /**
-     * 序列化遊戲狀態
-     */
-    serializeState(state) {
-        return JSON.stringify({
-            ...state,
-            _movableChessIds: state._movableChessIds ? Array.from(state._movableChessIds) : [],
-        });
-    }
-
-    /**
-     * 反序列化遊戲狀態
-     */
-    deserializeState(serializedState) {
-        const state = JSON.parse(serializedState);
-        return {
-            ...state,
-            _movableChessIds: new Set(state._movableChessIds || []),
-        };
-    }
+export function createInitialState() {
+    const state = {
+        currentPlayer: 0,
+        consecutiveSixCount: 0,
+        winner: null,
+        isGameOver: false,
+        players: {
+            red: [{ id: "red-0", state: "home", position: 0 }, { id: "red-1", state: "home", position: 1 }, { id: "red-2", state: "home", position: 2 }, { id: "red-3", state: "home", position: 3 }],
+            blue: [{ id: "blue-0", state: "home", position: 4 }, { id: "blue-1", state: "home", position: 5 }, { id: "blue-2", state: "home", position: 6 }, { id: "blue-3", state: "home", position: 7 }],
+            green: [{ id: "green-0", state: "home", position: 8 }, { id: "green-1", state: "home", position: 9 }, { id: "green-2", state: "home", position: 10 }, { id: "green-3", state: "home", position: 11 }],
+            yellow: [{ id: "yellow-0", state: "home", position: 12 }, { id: "yellow-1", state: "home", position: 13 }, { id: "yellow-2", state: "home", position: 14 }, { id: "yellow-3", state: "home", position: 15 }],
+        },
+
+        _movableChessIds: new Set(),
+        _lastDiceResult: 0,
+    };
+
+    return state;
 }
 
-// 導出單例實例
-export const gameEngine = new FlyingChessEngine(GAME_CONFIG, PATH_MAP, PLAYER_POSITIONS);
+export function fromFull(state) {
+    const ls = new GameState();
+    ls.player = state.currentPlayer;
+    ls.six = state.consecutiveSixCount;
+    ls.dice = state._lastDiceResult;
+
+    gameRules.PLAYER_COLOR.forEach((color, pIdx) => {
+        const base = pIdx * 4;                     // 每位玩家佔 4 個索引
+        state.players[color].forEach((c, i) => {
+            const idx = base + i;
+            if (c.state === 'home') {
+                ls.pos[idx] = c.position;
+                ls.st[idx] = 0;
+            } else if (c.state === 'goal') {
+                ls.pos[idx] = 255;
+                ls.st[idx] = 3;
+            } else {
+                ls.pos[idx] = c.position;
+                ls.st[idx] = c.state === 'path' ? 1 : 2;
+            }
+        });
+    });
+
+    if (state._lastDiceResult > 0 && state._movableChessIds.size > 0) {
+        const currentColor = gameRules.PLAYER_COLOR[state.currentPlayer];
+        let mask = 0;
+
+        for (const chessId of state._movableChessIds) {
+            if (!chessId.startsWith(currentColor + '-')) continue; // 防萬一
+            const localIdx = parseInt(chessId.split('-')[1]);
+            if (localIdx >= 0 && localIdx < 4) {
+                mask |= (1 << localIdx);
+            }
+        }
+
+        ls.movable = mask;
+    }
+
+    return ls;
+}
+
+export function toFull(lightState) {
+    const full = createInitialState();
+
+    full.currentPlayer = lightState.player;
+    full.consecutiveSixCount = lightState.six;
+    full._lastDiceResult = lightState.dice;
+    full.winner = lightState.winner === -1 ? null : gameRules.PLAYER_COLOR[lightState.winner];
+    full.isGameOver = lightState.winner !== -1;
+
+    gameRules.PLAYER_COLOR.forEach((color, pIdx) => {
+        const base = pIdx * 4;
+        for (let i = 0; i < 4; i++) {
+            const idx = base + i;
+            const pos = lightState.pos[idx];
+            const st = lightState.st[idx];
+
+            let stateStr = "home";
+            if (st === 1) stateStr = "path";
+            else if (st === 2) stateStr = "goal-path";
+            else if (st === 3) stateStr = "goal";
+
+            full.players[color][i] = {
+                id: `${color}-${i}`,
+                state: stateStr,
+                position: st === 3 ? gameRules.GOAL_PATH_START[pIdx] + 5 : pos,
+            };
+        }
+    });
+
+    full._movableChessIds.clear();
+
+    if (lightState.movable !== 0) {
+        const color = gameRules.PLAYER_COLOR[lightState.player];
+        for (let i = 0; i < 4; i++) {
+            if (lightState.movable & (1 << i)) {
+                full._movableChessIds.add(`${color}-${i}`);
+            }
+        }
+    }
+
+    return full;
+}
+
+
+export const gameEngine = {
+    createInitialState,
+
+    rollDice(fullState, dice) {
+        const light = fromFull(fullState);
+        const move = gameRules.roll(light, dice);
+        return toFull(light, move);
+    },
+
+    moveChess(fullState, chessId) {
+        const light = fromFull(fullState);
+        const localIdx = parseInt(chessId.split('-')[1]);
+        gameRules.move(light, localIdx);
+        return toFull(light);
+    },
+
+    getPlayerColor(playerIdx) {
+        return gameRules.PLAYER_COLOR[playerIdx];
+    },
+
+    cloneState(state) {
+        return JSON.parse(JSON.stringify(state));
+    },
+};

@@ -1,12 +1,12 @@
 import React from "react";
 import "./PlayerStatusGrid.css";
 
-const PlayerStatusGrid = ({ currentPlayer, players, gameConfig }) => {
+const PlayerStatusGrid = ({ currentPlayer, playersChess, gameConfig }) => {
   /**
    * 🎯 獲取玩家狀態摘要
    */
   const getPlayerStatus = (color) => {
-    const player = players[color];
+    const player = playersChess[color];
     const atHome = player.filter((chess) => chess.state === "home").length;
     const onPath = player.filter((chess) => chess.state === "path").length;
     const inGoalPath = player.filter((chess) => chess.state === "goal-path").length;

@@ -1,63 +1,63 @@
-import { gameEngine } from "./gameEngine";
 import MCTSNode from "./MCTSNode";
+import { gameRules, GameState } from "./gameRules";
+import { fromFull } from "./gameEngine";
 
 class GameAI {
-    constructor(gameEngine) {
-        this.gameEngine = gameEngine;
-        this.mctsIterations = 500;
-        this.maxDepth = 200;
+    constructor() {
+        this.iterations = 10000;  
+        this.maxDepth = 300;     // 隨機模擬最大深度
     }
 
-    /**
-     * 🎯 獲取AI的最佳移動決策
-     */
-    getBestMove(currentState) {
-        const state = this.cloneState(currentState);
+    // 公開 API：傳入原始完整 state，回傳原始格式的動作
+    getBestMove(fullState) {
+        if (fullState.isGameOver || !fullState._movableChessIds?.size) return null;
 
-        if (state.isGameOver) {
-            return null;
+        // 1. 建立根節點（輕量狀態）
+        const rootLight = fromFull(fullState);
+        const rootNode = new MCTSNode(rootLight);
+
+        // 2. 若已經擲過骰子，只考慮當前點數的合法動作
+        if (fullState._lastDiceResult !== 0 && fullState._movableChessIds.size > 0) {
+            rootNode.untriedActions = this._getUniqueActions(rootLight, fullState._lastDiceResult);
         }
 
-        // 如果沒有可移動的棋子，返回null
-        if (!state._movableChessIds || state._movableChessIds.size === 0) {
-            return null;
-        }
+        // 3. MCTS 主迴圈
+        for (let i = 0; i < this.iterations; i++) {
+            // Selection：從 root 挑一個節點
+            let node = this._select(rootNode);
 
-        // 使用MCTS搜索最佳移動
-        return this.mctsSearch(state);
-    }
-
-    /**
-     * 🔍 MCTS搜索主函數
-     */
-    mctsSearch(diceState) {
-        const rootNode = new MCTSNode(diceState);
-
-        // 🎯 關鍵：過濾只考慮實際骰子點數的動作
-        if (diceState._lastDiceResult !== 0) {
-            rootNode.untriedActions = this.getLegalActions(diceState).filter(action => action.dice === diceState._lastDiceResult);
-        }
-
-        for (let i = 0; i < this.mctsIterations; i++) {
-            let node = this.select(rootNode);
-
+            // Expansion：如果還有未嘗試的動作，就隨機挑一個展開
             if (!node.isTerminal()) {
-                node = this.expand(node);
+                node = this._expand(node);
             }
 
-            const result = this.simulate(node);
-            this.backpropagate(node, result);
+            // Simulation：隨機玩到結束或達深度上限
+            const winner = this._simulation(node);
+
+            // Backpropagation：把結果往上更新
+            const reward = winner === -1 ? 0 : (winner === fullState.currentPlayer ? 1 : -1);
+            this._backpropagate(node, reward);
         }
 
-        return this.getBestAction(rootNode);
+        // 4. 選出被訪問最多次的子節點 → 最佳動作
+        if (rootNode.children.length === 0) return null;
+        const bestChild = rootNode.children.reduce((a, b) => a.visits > b.visits ? a : b);
+        const act = bestChild.action;
+
+        // 5. 轉回原始 gameEngine 要求的格式
+        const color = gameRules.PLAYER_COLOR[fullState.currentPlayer];
+        const chessId = `${color}-${act.localIdx}`;
+
+        return {
+            type: 'move',
+            chessId: chessId,
+            dice: act.dice
+        };
     }
 
-    /**
-     * 📝 選擇階段 - 選擇要擴展的節點
-     */
-    select(node) {
-        while (node.isFullyExpanded(this.generateActions.bind(this)) && !node.isTerminal()) {
-            const nextNode = this.getBestChild(node);
+    _select(node) {
+        while (node.isFullyExpanded(this._getUniqueActions.bind(this)) && !node.isTerminal()) {
+            const nextNode = this._bestChild(node);
             if (!nextNode) {
                 break;
             }
@@ -66,69 +66,117 @@ class GameAI {
         return node;
     }
 
-    /**
-     * 🌱 擴展階段 - 擴展新節點
-     */
-    expand(node) {
-        const action = node.selectUntriedAction(this.generateActions.bind(this));
+    _expand(node) {
+        const action = node.selectUntriedAction(this._getUniqueActions.bind(this));
         if (!action) {
             return node;
         }
 
-        let diceState = node.gameState;
+        const newLs = this._copyLight(node.gameState);
 
-        if (node.gameState._lastDiceResult === 0) {
-            diceState = this.gameEngine.rollDice(node.gameState, action.dice)
+        if (newLs.dice === 0) {
+            gameRules.roll(newLs, action.dice)
         }
 
-        const nextState = this.gameEngine.moveChess(diceState, action.chessId);
+        gameRules.move(newLs, action.localIdx);
 
-        return node.addChild(nextState, action);
+        return node.addChild(newLs, action);
     }
 
-    /**
-     * 🎲 模擬階段 - 隨機模擬遊戲直到結束
-     */
-    simulate(node) {
-        let state = this.cloneState(node.gameState);
-        let depth = 0;
+    _simulation(node) {
+        const ls = this._copyLight(node.gameState);
 
-        while (!state.isGameOver && depth < this.maxDepth) {
-            // 1. 隨機擲骰子
+        for (let d = 0; d < this.maxDepth; d++) {
+            if (ls.winner !== -1) return ls.winner;
+
             const dice = Math.floor(Math.random() * 6) + 1;
-            const diceState = this.gameEngine.rollDice(state, dice);
+            gameRules.roll(ls, dice);
 
-            // 2. 檢查是否有可移動棋子
-            if (!diceState._movableChessIds || diceState._movableChessIds.size === 0) {
-                state = diceState; // 換玩家
-                depth++;
-                continue;
+            if (ls.movable === 0) continue;                 // 無棋可動 → 換人
+
+            const bits = [];
+            for (let i = 0; i < 4; i++) {
+                if (ls.movable & (1 << i)) bits.push(i);
             }
 
-            // 3. 隨機選擇動作
-            const chessIds = Array.from(diceState._movableChessIds);
-            const chessId = chessIds[Math.floor(Math.random() * chessIds.length)];
-            state = this.gameEngine.moveChess(diceState, chessId);
-            depth++;
+            const choice = bits[Math.floor(Math.random() * bits.length)];
+            gameRules.move(ls, choice);
         }
-
-        return this.calculateReward(state, node.gameState.currentPlayer);
+        return ls.winner !== -1 ? ls.winner : -1;        // -1 = 未分勝負（算平手）
     }
 
-    /**
-     * 📊 反向傳播階段 - 更新節點統計信息
-     */
-    backpropagate(node, result) {
+
+    _backpropagate(node, result) {
         while (node !== null) {
             node.update(result);
             node = node.parent;
         }
     }
 
-    /**
-     * 🏆 獲取最佳子節點（基於UCT分數）
-     */
-    getBestChild(node) {
+    _getUniqueActions(ls, fixedDice = null) {
+        const actions = [];
+
+        // 情況1：已經擲過骰子 → 直接用 ls.dice（此時 ls 已經是 roll 後的狀態）
+        if (fixedDice !== null) {
+            // 重要：此時 ls 已經是 roll 完的狀態，movable 直接從當前 ls 計算
+            const movable = this._computeMovableMask(ls, fixedDice); // 下面會給定義
+
+            if (movable !== 0) {
+                const seen = new Set();
+                const base = ls.player * 4;
+
+                for (let i = 0; i < 4; i++) {
+                    if ((movable & (1 << i)) === 0) continue;
+
+                    const key = ls.st[base + i] === 0 ? 'home' : ls.pos[base + i];
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        actions.push({ dice: fixedDice, localIdx: i });
+                    }
+                }
+            }
+            return actions;
+        }
+
+        // 情況2：還沒擲骰子 → 才需要試 1~6
+        for (let d = 1; d <= 6; d++) {
+            const temp = this._copyLight(ls);
+
+            gameRules.roll(temp, d);
+
+            if (temp.movable === 0) continue;
+
+            const seen = new Set();
+            const base = ls.player * 4;
+
+            for (let i = 0; i < 4; i++) {
+                if ((temp.movable & (1 << i)) === 0) continue;
+
+                const key = temp.st[base + i] === 0 ? 'home' : temp.pos[base + i];
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    actions.push({ dice: d, localIdx: i });
+                }
+            }
+        }
+
+        return actions;
+    }
+
+    _computeMovableMask(ls, dice) {
+        let mask = 0;
+        const base = ls.player * 4;
+
+        for (let i = 0; i < 4; i++) {
+            const st = ls.st[base + i];
+            if ((st === 0 && dice === 6) || st === 1 || st === 2) {
+                mask |= (1 << i);
+            }
+        }
+        return mask;
+    }
+
+    _bestChild(node) {
         let bestChild = null;
         let bestScore = -1;
 
@@ -144,114 +192,22 @@ class GameAI {
         return bestChild;
     }
 
-    /**
-     * 🎯 從根節點獲取最佳動作
-     */
-    getBestAction(rootNode) {
-        let bestAction = null;
-        let bestVisits = -1;
-
-        for (const child of rootNode.children) {
-            if (child.visits > bestVisits) {
-                bestVisits = child.visits;
-                bestAction = child.action;
-            }
-        }
-
-        return bestAction;
+    // 極速複製輕量狀態
+    _copyLight(ls) {
+        const n = new GameState();
+        n.pos.set(ls.pos);
+        n.st.set(ls.st);
+        n.player = ls.player;
+        n.six = ls.six;
+        n.winner = ls.winner;
+        n.dice = ls.dice;
+        n.movable = ls.movable;
+        return n;
     }
 
-    /**
-     * 📋 獲取合法動作列表
-     */
-    getLegalActions(state) {
-        if (!state._movableChessIds || state._movableChessIds.size === 0) {
-            return [];
-        }
-
-        const actions = [];
-        const movableChessIds = Array.from(state._movableChessIds);
-
-        for (const chessId of movableChessIds) {
-            actions.push({
-                type: 'move',
-                chessId: chessId,
-                dice: state._lastDiceResult
-            });
-        }
-
-        return actions;
-    }
-
-    /**
-     * 🛠️ 動作生成器（依賴注入的核心）
-     */
-    generateActions(gameState) {
-        const actions = [];
-
-        // 考慮所有可能的骰子點數 (1-6)
-
-        for (let dice = 1; dice <= 6; dice++) {
-            // 模擬擲這個點數的骰子
-            const diceState = this.gameEngine.rollDice(gameState, dice);
-
-            // 如果沒有可移動的棋子，跳過這個骰子點數
-            if (!diceState._movableChessIds || diceState._movableChessIds.size === 0) {
-                continue;
-            }
-
-            // 為每個可移動的棋子創建動作
-            const movableChessIds = Array.from(diceState._movableChessIds);
-            for (const chessId of movableChessIds) {
-                actions.push({
-                    type: 'move',
-                    dice: dice,      // 🎲 骰子點數
-                    chessId: chessId // ♟️ 棋子選擇
-                });
-            }
-        }
-
-        return actions;
-    }
-
-    /**
-     * 💰 計算獎勵值
-     */
-    calculateReward(finalState, originalPlayer) {
-        if (finalState.isGameOver) {
-            const winnerIndex = this.colorToPlayerIndex(finalState.winner);
-            if (winnerIndex === originalPlayer) {
-                return 1; // 勝利
-            } else {
-                return -1; // 失敗
-            }
-        }
-
-        return 0;
-    }
-
-    /**
-     * 🎨 將顏色轉換為玩家索引
-     */
-    colorToPlayerIndex(color) {
-        const colorMap = { 'red': 0, 'yellow': 1, 'green': 2, 'blue': 3 };
-        return colorMap[color] || 0;
-    }
-
-    /**
-     * 🧬 克隆遊戲狀態
-     */
-    cloneState(state) {
-        const serialized = this.gameEngine.serializeState(state);
-        return this.gameEngine.deserializeState(serialized);
-    }
-
-    /**
-     * ⚙️ 設置MCTS迭代次數
-     */
-    setIterations(iterations) {
-        this.mctsIterations = iterations;
-    }
+    // 外部可動態調整思考時間
+    setIterations(n) { this.iterations = n; }
 }
 
-export const gameAI = new GameAI(gameEngine);
+// 匯出單例
+export const gameAI = new GameAI();

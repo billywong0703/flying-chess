@@ -7,7 +7,7 @@ import CurrentPlayerDisplay from "./CurrentPlayerDisplay";
 import PlayerStatusGrid from "./PlayerStatusGrid";
 import ActionLog from "./ActionLog";
 import VictoryScreen from "./VictoryScreen";
-import { gameEngine } from "./engine/gameEngine";
+import { gameEngine, PATH_MAP, GAME_CONFIG } from "./engine/gameEngine";
 import { gameAI } from "./engine/gameAI"; // 導入AI
 
 const Board = () => {
@@ -73,7 +73,7 @@ const Board = () => {
     addLog(`🤖 ${currentPlayerColor} AI 正在思考...`, "info");
 
     // 給AI一點思考時間，讓玩家能看到過程
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    //await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // AI擲骰子
     const diceResult = Math.floor(Math.random() * 6) + 1;
@@ -94,9 +94,12 @@ const Board = () => {
       // AI選擇最佳移動
       const action = gameAI.getBestMove(newGameState, diceResult);
       if (action) {
+        console.log(currentPlayerColor);
         newGameState = gameEngine.moveChess(newGameState, action.chessId);
+        console.log(newGameState);
+        console.log(action);
 
-        const cellInfo = gameEngine.getCellInfo(newGameState.players[currentPlayerColor].find((chess) => chess.id === action.chessId).position);
+        const cellInfo = PATH_MAP[newGameState.players[currentPlayerColor].find((chess) => chess.id === action.chessId).position];
 
         if (cellInfo.type === "goal") {
           addLog(`🎉 ${currentPlayerColor} AI 的飛機到達終點！`, "goal");
@@ -205,18 +208,18 @@ const Board = () => {
 
       <div className="game-controls">
         <Dice onRoll={handleDiceRoll} disabled={isDiceDisabled || gameState.isGameOver || isAITurn} />
-        <CurrentPlayerDisplay currentPlayer={gameState.currentPlayer} players={gameState.players} gameConfig={gameEngine.config} isAITurn={isAITurn} aiPlayers={aiPlayers.current} />
-        <PlayerStatusGrid currentPlayer={gameState.currentPlayer} players={gameState.players} gameConfig={gameEngine.config} aiPlayers={aiPlayers.current} />
+        <CurrentPlayerDisplay currentPlayer={gameState.currentPlayer} playersChess={gameState.players} gameConfig={GAME_CONFIG} isAITurn={isAITurn} aiPlayers={aiPlayers.current} />
+        <PlayerStatusGrid currentPlayer={gameState.currentPlayer} playersChess={gameState.players} gameConfig={GAME_CONFIG} aiPlayers={aiPlayers.current} />
       </div>
 
       <div className="game-board">
         <div className="container">
           <PlayerBoardSpace color="red" gridArea="1 / 4 / 4 / 1" />
-          <PlayerBoardSpace color="yellow" gridArea="16 / 13 / 13 / 16" />
           <PlayerBoardSpace color="green" gridArea="1 / 13 / 4 / 16" />
           <PlayerBoardSpace color="blue" gridArea="16 / 1 / 13 / 4" />
+          <PlayerBoardSpace color="yellow" gridArea="16 / 13 / 13 / 16" />
 
-          {Object.values(gameEngine.pathMap)
+          {Object.values(PATH_MAP)
             .filter((cell) => ["home", "path", "start", "goal-entry", "goal", "goal-path"].includes(cell.type))
             .map((cell, index) => (
               <Cell key={`cell-${cell.x}-${cell.y}-${index}`} color={cell.color} x={cell.x} y={cell.y} />
@@ -238,7 +241,7 @@ const Board = () => {
 };
 
 const ChessPiece = ({ chess, color, isHighlighted, onChessClick, isAITurn }) => {
-  const cell = gameEngine.getCellInfo(chess.position);
+  const cell = PATH_MAP[chess.position];
   if (!cell) return null;
 
   const isInHomeBase = chess.state === "home";
