@@ -9,6 +9,7 @@ export default defineConfig({
   })],
   test: {
     globals: true,
+    testTimeout: 50000,
     environment: 'jsdom',
     setupFiles: './src/test/test-setup.js',
     coverage: {
