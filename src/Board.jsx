@@ -1,5 +1,5 @@
 // Board.js - 修改版本
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./Board.css";
 import Chess from "./Chess";
 import Dice from "./Dice";
@@ -8,7 +8,6 @@ import PlayerStatusGrid from "./PlayerStatusGrid";
 import ActionLog from "./ActionLog";
 import VictoryScreen from "./VictoryScreen";
 import { gameEngine, PATH_MAP, GAME_CONFIG } from "./engine/gameEngine";
-import { gameAI } from "./engine/gameAI"; // 導入AI
 
 const Board = () => {
   // 🎮 遊戲狀態
@@ -46,18 +45,21 @@ const Board = () => {
     setPlayerLog((prev) => [newLog, ...prev]);
   };
 
-  const syncUIWithGameState = (newGameState) => {
-    setGameState(newGameState);
-    setHighlightedChessIds(newGameState._movableChessIds || new Set());
+  const syncUIWithGameState = useCallback(
+    (newGameState) => {
+      setGameState(newGameState);
+      setHighlightedChessIds(newGameState._movableChessIds || new Set());
 
-    const shouldDisableDice = newGameState.isGameOver || (newGameState._movableChessIds && newGameState._movableChessIds.size > 0) || isAITurn;
-    setIsDiceDisabled(shouldDisableDice);
+      const shouldDisableDice = newGameState.isGameOver || (newGameState._movableChessIds && newGameState._movableChessIds.size > 0) || isAITurn;
+      setIsDiceDisabled(shouldDisableDice);
 
-    if (newGameState.isGameOver && newGameState.winner) {
-      setShowVictoryScreen(true);
-      addLog(`🎉 ${newGameState.winner} 玩家獲得了遊戲勝利！`, "victory");
-    }
-  };
+      if (newGameState.isGameOver && newGameState.winner) {
+        setShowVictoryScreen(true);
+        addLog(`🎉 ${newGameState.winner} 玩家獲得了遊戲勝利！`, "victory");
+      }
+    },
+    [isAITurn]
+  );
 
   // ===========================================================================
   // AI回合處理
@@ -66,14 +68,11 @@ const Board = () => {
   /**
    * 🤖 處理AI回合
    */
-  const handleAITurn = async () => {
+  const handleAITurn = useCallback(async () => {
     if (gameState.isGameOver || !isAITurn) return;
 
     const currentPlayerColor = gameEngine.getPlayerColor(gameState.currentPlayer);
     addLog(`🤖 ${currentPlayerColor} AI 正在思考...`, "info");
-
-    // 給AI一點思考時間，讓玩家能看到過程
-    //await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // AI擲骰子
     const diceResult = Math.floor(Math.random() * 6) + 1;
@@ -91,13 +90,13 @@ const Board = () => {
     }
 
     if (newGameState._movableChessIds && newGameState._movableChessIds.size > 0) {
-      // AI選擇最佳移動
-      const action = gameAI.getBestMove(newGameState, diceResult);
+      // eslint-disable-next-line no-undef
+      const aiWorker = new ComlinkWorker(new URL("./workers/gameAI.worker.js", import.meta.url));
+
+      const action = await aiWorker.getBestMove(newGameState);
+
       if (action) {
-        console.log(currentPlayerColor);
         newGameState = gameEngine.moveChess(newGameState, action.chessId);
-        console.log(newGameState);
-        console.log(action);
 
         const cellInfo = PATH_MAP[newGameState.players[currentPlayerColor].find((chess) => chess.id === action.chessId).position];
 
@@ -107,11 +106,13 @@ const Board = () => {
           addLog(`➡️ ${currentPlayerColor} AI 移動了飛機`, "move");
         }
       }
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
     setIsAITurn(false);
     syncUIWithGameState(newGameState);
-  };
+  }, [gameState, isAITurn, syncUIWithGameState]);
 
   // ===========================================================================
   // 遊戲操作處理函數
@@ -189,7 +190,7 @@ const Board = () => {
   useEffect(() => {
     if (!isAITurn) return;
     handleAITurn();
-  }, [isAITurn]);
+  }, [isAITurn, handleAITurn]);
 
   useEffect(() => {
     if (gameState._movableChessIds && gameState._movableChessIds.size !== 0) return;
