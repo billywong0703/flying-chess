@@ -2,6 +2,7 @@ import { PATH_MAP } from "./gameEngine";
 
 
 export class GameState {
+    // 如果 dice = 0 和 movable = 0 的話，代表(狀態 = 等待擲骰)，否則(狀態 = 等待行動)
     constructor() {
         this.pos = new Uint8Array(16); // 每顆棋子的位置（0~15 = 家區，16~67 = 跑道， 68~91 = 家門通道，255 = 已到終點）
         this.st = new Uint8Array(16);   // 狀態：0=家區, 1=外圈跑道, 2=家門通道, 3=已到終點
@@ -26,25 +27,27 @@ export const gameRules = {
     // 同時處理「連續三個6」懲罰
     roll(ls, dice) {
         ls.dice = dice;
-        if (dice === 6) ls.six++;
-        else ls.six = 0;
+        const p = ls.player;
+        const base = p * 4;
+        let sixCount = ls.six;
+        sixCount = dice === 6 ? sixCount + 1 : 0;
 
         // 連續三個6 → 所有在跑道上的棋子飛回基地
-        if (ls.six === 3) {
-            for (let i = ls.player * 4; i < ls.player * 4 + 4; i++) {
+        if (sixCount === 3) {
+            for (let i = base; i < base + 4; i++) {
                 if (ls.st[i] !== 0 && ls.st[i] !== 3) {   // 不在家也不在終點
-                    ls.pos[i] = ls.player * 4 + (i % 4);      // 回各自家區格子
+                    ls.pos[i] = base + (i % 4);      // 回各自家區格子
                     ls.st[i] = 0;
                 }
             }
             ls.six = 0;
-            ls.player = (ls.player + 1) % 4;              // 換下家
+            ls.dice = 0;
+            ls.player = (p + 1) % 4;              // 換下家
             return;                                     // 無棋可移動
         }
 
         // 正常情況：計算可移動的棋子
         let movable = 0;
-        const base = ls.player * 4;
         for (let i = 0; i < 4; i++) {
             const s = ls.st[base + i];
             if ((s === 0 && dice === 6) || s === 1 || s === 2) {
@@ -53,7 +56,8 @@ export const gameRules = {
         }
 
         if (movable === 0) {
-            ls.player = (ls.player + 1) % 4;
+            ls.dice = 0;
+            ls.player = (p + 1) % 4;
         };
 
         ls.movable = movable;
@@ -149,14 +153,15 @@ export const gameRules = {
             ls.st[sIdx] = st;
         }
 
-        if (pos === 255) { // 飛進終點了！
+        // 飛進終點
+        if (pos === 255) {
             this._checkWin(ls);
         }
 
         // ── 5. 決定下一位玩家（擲到6可再擲） ───────────────
-        ls.player = (ls.player + (dice === 6 ? 0 : 1)) % 4;
         ls.dice = 0;
         ls.movable = 0;
+        ls.player = (p + (dice === 6 ? 0 : 1)) % 4;
     },
 
     _getFreeHomeSlot(ls, player) {

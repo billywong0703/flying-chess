@@ -6,19 +6,19 @@ import { gameAI } from '../engine/gameAI'
 describe('飛行棋 AI 行為與強度測試', () => {
     // 讓每次測試都從乾淨的 AI 開始（避免內部快取影響）
     beforeEach(() => {
-        gameAI.setIterations(10000) // 1.5 萬次迭代，大概 100~300ms，足夠看出差別
+        gameAI.setIterations(10000)
     })
 
-    // 1. 經典「起飛優先」測試（你已經有，加強版）
+    // 1. 經典「起飛優先」測試
     it('擲 6 點時，應極大概率起飛而不是移動跑道上的棋子', () => {
         const state = gameEngine.createInitialState()
         state.currentPlayer = 0 // red
-        state.players.red[0] = { id: 'red-0', state: 'path', position: 20 }
+        state.players.red[1] = { id: 'red-1', state: 'path', position: 20 }
 
         const rolled = gameEngine.rollDice(state, 6)
         const decisions = Array.from({ length: 10 }, () => gameAI.getBestMove(rolled)?.chessId)
 
-        const flyCount = decisions.filter(id => id >= 'red-1' && id <= 'red-3').length
+        const flyCount = decisions.filter(id => id === 'red-0').length
         console.log('起飛次數 / 總次數:', flyCount, '/', 10, decisions)
 
         expect(flyCount).toBeGreaterThanOrEqual(10)
@@ -46,10 +46,10 @@ describe('飛行棋 AI 行為與強度測試', () => {
         const state = gameEngine.createInitialState()
         state.currentPlayer = 0 // red
         state.players.red[0] = { id: 'red-0', state: 'path', position: 65 }
-        state.players.red[1] = { id: 'red-1', state: 'path', position: 25 }
+        state.players.red[1] = { id: 'red-1', state: 'path', position: 26 }
         state.players.blue[0] = { id: 'blue-0', state: 'path', position: 23 }
 
-        const rolled = gameEngine.rollDice(state, 4)
+        const rolled = gameEngine.rollDice(state, 3)
         const decisions = Array.from({ length: 10 }, () => gameAI.getBestMove(rolled)?.chessId)
         const count = decisions.filter(id => id === 'red-1').length
 
@@ -71,17 +71,16 @@ describe('飛行棋 AI 行為與強度測試', () => {
         const count = decisions.filter(id => id === 'red-1').length
 
         console.log('疊棋測試:', decisions)
-        expect(count).toBeGreaterThanOrEqual(7) // 70%以上選擇衝線（考虑到AI决策复杂性）
+        expect(count).toBeGreaterThanOrEqual(7)
     })
 
     // 多目標競爭測試
     it('在複雜的多目標情況下，應該做出合理的權衡', () => {
         const state = gameEngine.createInitialState()
         state.currentPlayer = 0
-        // 複雜場景：red-0 可以攻擊 blue-0，red-1 可以衝線，red-2 剛起飛
         state.players.red[0] = { id: 'red-0', state: 'path', position: 20 }
-        state.players.red[1] = { id: 'red-1', state: 'goal-path', position: 69 }
-        state.players.red[2] = { id: 'red-2', state: 'path', position: 6 }
+        state.players.red[1] = { id: 'red-1', state: 'path', position: 6 }
+        state.players.red[2] = { id: 'red-2', state: 'goal-path', position: 69 }
         state.players.blue[0] = { id: 'blue-0', state: 'path', position: 24 }
 
         const rolled = gameEngine.rollDice(state, 4)
@@ -89,7 +88,7 @@ describe('飛行棋 AI 行為與強度測試', () => {
 
         console.log('多目標決策:', decisions)
         // 期望AI能夠在攻擊和衝線之間做出合理選擇
-        const finishCount = decisions.filter(id => id === 'red-1').length
+        const finishCount = decisions.filter(id => id === 'red-2').length
 
         // 至少應該有一定比例選擇衝線（更優先的目標）
         expect(finishCount).toBeGreaterThan(5)
