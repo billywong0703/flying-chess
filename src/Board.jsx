@@ -9,6 +9,9 @@ import ActionLog from "./ActionLog";
 import VictoryScreen from "./VictoryScreen";
 import { gameEngine, PATH_MAP, GAME_CONFIG } from "./engine/gameEngine";
 
+// eslint-disable-next-line no-undef
+const aiWorker = new ComlinkWorker(new URL("./workers/gameAI.worker.js", import.meta.url));
+
 const Board = () => {
   // 🎮 遊戲狀態
   const [gameState, setGameState] = useState(() => gameEngine.createInitialState());
@@ -90,9 +93,6 @@ const Board = () => {
     }
 
     if (newGameState._movableChessIds && newGameState._movableChessIds.size > 0) {
-      // eslint-disable-next-line no-undef
-      const aiWorker = new ComlinkWorker(new URL("./workers/gameAI.worker.js", import.meta.url));
-
       const action = await aiWorker.getBestMove(newGameState);
 
       if (action) {
