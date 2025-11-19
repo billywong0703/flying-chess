@@ -79,6 +79,26 @@ describe('遊戲邏輯測試', () => {
         expect(ls.st[12]).toBe(2)
     })
 
+    // 測試 5: 暢順進入家門2
+    it('暢順進入家門123123', () => {
+        // 建立一個簡單的完整狀態
+        const fullState = gameEngine.createInitialState()
+        fullState.currentPlayer = 3 // yellow
+        fullState.consecutiveSixCount = 2
+        // 修改一些棋子狀態
+        fullState.players.yellow[2] = { id: 'yellow-2', state: 'path', position: 63 }
+        fullState.players.yellow[3] = { id: 'yellow-3', state: 'path', position: 63 }
+
+        const ls = fromFull(fullState)
+        gameRules.roll(ls, 4)
+        console.log(ls)
+        gameRules.move(ls, 2)
+        console.log(ls)
+
+        expect(ls.pos[14]).toBe(19)
+        expect(ls.st[14]).toBe(1)
+    })
+
 
     // 測試: move - 家門通道移動，過衝終點
     it('家門通道移動應處剛好進終點', () => {

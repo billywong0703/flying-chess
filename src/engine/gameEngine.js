@@ -232,6 +232,28 @@ export const gameEngine = {
         const light = fromFull(fullState);
         const localIdx = parseInt(chessId.split('-')[1]);
         gameRules.move(light, localIdx);
+
+        if (light.pos[12] === 68 || light.pos[13] === 68 || light.pos[14] === 68 || light.pos[15] === 68) {
+            console.log(fullState);
+            console.log(light);
+        }
+        if (light.pos[12] === 69 || light.pos[13] === 69 || light.pos[14] === 69 || light.pos[15] === 69) {
+            console.log(fullState);
+            console.log(light);
+        }
+        if (light.pos[12] === 70 || light.pos[13] === 70 || light.pos[14] === 70 || light.pos[15] === 70) {
+            console.log(fullState);
+            console.log(light);
+        }
+        if (light.pos[12] === 71 || light.pos[13] === 71 || light.pos[14] === 71 || light.pos[15] === 71) {
+            console.log(fullState);
+            console.log(light);
+        }
+        if (light.pos[12] === 72 || light.pos[13] === 72 || light.pos[14] === 72 || light.pos[15] === 72) {
+            console.log(fullState);
+            console.log(light);
+        }
+
         return toFull(light);
     },
 

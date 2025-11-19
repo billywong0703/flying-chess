@@ -104,7 +104,7 @@ export const gameRules = {
 
                 // 跳躍規則：踩到自己顏色的格子（不包含入口格）
                 if (pos !== entry && PATH_MAP[pos]?.color === this.PLAYER_COLOR[p]) {
-                    pos = nextPos + 4;
+                    pos = this.RING_START + (nextPos - this.RING_START + dice) % this.RING_SIZE;
                 }
             }
         }
