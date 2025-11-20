@@ -95,7 +95,7 @@ const Board = () => {
         if (cellInfo.type === "goal") {
           addLog(`🎉 ${currentPlayerColor} AI 的飛機到達終點！`, "goal");
         } else {
-          addLog(`➡️ ${currentPlayerColor} AI 移動了飛機 ${action.localidx}`, "move");
+          addLog(`➡️ ${currentPlayerColor} AI 移動了飛機 ${action.chessId}`, "move");
         }
       }
     } else {

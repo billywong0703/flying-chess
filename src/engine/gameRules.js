@@ -26,10 +26,10 @@ export const gameRules = {
         ls.dice = dice;
         const p = ls.player;
         const base = p * 4;
-        let sixCount = dice === 6 ? ls.six + 1 : 0;
+        ls.six = dice === 6 ? ls.six + 1 : 0;
 
         // 連續三個6 → 所有在跑道上的棋子飛回基地
-        if (sixCount === 3) {
+        if (ls.six === 3) {
             for (let i = base; i < base + 4; i++) {
                 if (ls.st[i] !== 0 && ls.st[i] !== 3) {   // 不在家也不在終點
                     ls.pos[i] = base + (i % 4);      // 回各自家區格子

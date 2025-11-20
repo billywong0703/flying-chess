@@ -51,6 +51,36 @@ describe('遊戲邏輯測試', () => {
         expect(ls.player).toBe(1)
     })
 
+    it('連續三個6應懲罰，將跑道棋子飛回家並換下一玩家2', () => {
+        const fullState = gameEngine.createInitialState()
+        fullState.currentPlayer = 0
+        fullState.consecutiveSixCount = 0
+        fullState.players.red[0] = { id: 'red-0', state: 'path', position: 65 }
+        fullState.players.yellow[1] = { id: 'yellow-1', state: 'goal-path', position: 75 }
+        fullState.players.green[2] = { id: 'green-2', state: 'goal', position: 85 }
+        fullState.players.blue[3] = { id: 'blue-3', state: 'home', position: 7 }
+
+        const ls = fromFull(fullState)
+        gameRules.roll(ls, 6)
+        gameRules.move(ls, 1)
+        gameRules.roll(ls, 6)
+        gameRules.move(ls, 2)
+        gameRules.roll(ls, 6)
+        gameRules.move(ls, 3)
+        console.log(ls)
+
+        expect(ls.pos[0]).toBe(0)
+        expect(ls.pos[1]).toBe(1)
+        expect(ls.pos[2]).toBe(2)
+        expect(ls.pos[3]).toBe(3)
+        expect(ls.st[0]).toBe(0)
+        expect(ls.st[1]).toBe(0)
+        expect(ls.st[2]).toBe(0)
+        expect(ls.st[3]).toBe(0)
+        expect(ls.six).toBe(0)
+        expect(ls.player).toBe(1)
+    })
+
 
     it('暢順進入家門', () => {
         const fullState = gameEngine.createInitialState()
