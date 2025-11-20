@@ -1,15 +1,5 @@
+import { gameAI } from "./gameAI";
 import { gameRules, GameState } from "./gameRules";
-
-// =============================================================================
-// 遊戲配置和常量
-// =============================================================================
-
-export const GAME_CONFIG = {
-    PLAYER_COLORS: ["red", "blue", "green", "yellow"],
-    PLAYER_ORDER: { 0: "red", 1: "blue", 2: "green", 3: "yellow" },
-    RING_START: 16,
-    RING_SIZE: 52,
-};
 
 export const PATH_MAP = {
     // 家區格子
@@ -31,58 +21,58 @@ export const PATH_MAP = {
     15: { x: 15, y: 15, type: "home-base", player: "yellow" },
 
     // 外圈跑道
-    16: { x: 3, y: 4, color: "blue", type: "path" },
-    17: { x: 2, y: 4, color: "red", type: "path" },
-    18: { x: 1, y: 4, color: "green", type: "path" },
-    19: { x: 1, y: 5, color: "yellow", type: "path" },
-    20: { x: 1, y: 6, color: "blue", type: "path" },
-    21: { x: 1, y: 7, color: "red", type: "path" },
-    22: { x: 1, y: 8, color: "green", type: "goal-entry", player: "green" },
-    23: { x: 1, y: 9, color: "yellow", type: "path" },
-    24: { x: 1, y: 10, color: "blue", type: "path" },
-    25: { x: 1, y: 11, color: "red", type: "path" },
-    26: { x: 1, y: 12, color: "green", type: "start", player: "green" },
-    27: { x: 2, y: 12, color: "yellow", type: "path" },
-    28: { x: 3, y: 12, color: "blue", type: "path" },
-    29: { x: 4, y: 13, color: "red", type: "path" },
-    30: { x: 4, y: 14, color: "green", type: "path" },
-    31: { x: 4, y: 15, color: "yellow", type: "path" },
-    32: { x: 5, y: 15, color: "blue", type: "path" },
-    33: { x: 6, y: 15, color: "red", type: "path" },
-    34: { x: 7, y: 15, color: "green", type: "path" },
-    35: { x: 8, y: 15, color: "yellow", type: "goal-entry", player: "yellow" },
-    36: { x: 9, y: 15, color: "blue", type: "path" },
-    37: { x: 10, y: 15, color: "red", type: "path" },
-    38: { x: 11, y: 15, color: "green", type: "path" },
-    39: { x: 12, y: 15, color: "yellow", type: "start", player: "yellow" },
-    40: { x: 12, y: 14, color: "blue", type: "path" },
-    41: { x: 12, y: 13, color: "red", type: "path" },
-    42: { x: 13, y: 12, color: "green", type: "path" },
-    43: { x: 14, y: 12, color: "yellow", type: "path" },
-    44: { x: 15, y: 12, color: "blue", type: "path" },
-    45: { x: 15, y: 11, color: "red", type: "path" },
-    46: { x: 15, y: 10, color: "green", type: "path" },
-    47: { x: 15, y: 9, color: "yellow", type: "path" },
-    48: { x: 15, y: 8, color: "blue", type: "goal-entry", player: "blue" },
-    49: { x: 15, y: 7, color: "red", type: "path" },
-    50: { x: 15, y: 6, color: "green", type: "path" },
-    51: { x: 15, y: 5, color: "yellow", type: "path" },
-    52: { x: 15, y: 4, color: "blue", type: "start", player: "blue" },
-    53: { x: 14, y: 4, color: "red", type: "path" },
-    54: { x: 13, y: 4, color: "green", type: "path" },
-    55: { x: 12, y: 3, color: "yellow", type: "path" },
-    56: { x: 12, y: 2, color: "blue", type: "path" },
-    57: { x: 12, y: 1, color: "red", type: "path" },
-    58: { x: 11, y: 1, color: "green", type: "path" },
-    59: { x: 10, y: 1, color: "yellow", type: "path" },
-    60: { x: 9, y: 1, color: "blue", type: "path" },
-    61: { x: 8, y: 1, color: "red", type: "goal-entry", player: "red" },
-    62: { x: 7, y: 1, color: "green", type: "path" },
-    63: { x: 6, y: 1, color: "yellow", type: "path" },
-    64: { x: 5, y: 1, color: "blue", type: "path" },
-    65: { x: 4, y: 1, color: "red", type: "start", player: "red" },
-    66: { x: 4, y: 2, color: "green", type: "path" },
-    67: { x: 4, y: 3, color: "yellow", type: "path" },
+    16: { x: 2, y: 4, color: "red", type: "path" },
+    17: { x: 1, y: 4, color: "green", type: "path" },
+    18: { x: 1, y: 5, color: "yellow", type: "path" },
+    19: { x: 1, y: 6, color: "blue", type: "path" },
+    20: { x: 1, y: 7, color: "red", type: "path" },
+    21: { x: 1, y: 8, color: "green", type: "goal-entry", player: "green" },
+    22: { x: 1, y: 9, color: "yellow", type: "path" },
+    23: { x: 1, y: 10, color: "blue", type: "path" },
+    24: { x: 1, y: 11, color: "red", type: "path" },
+    25: { x: 1, y: 12, color: "green", type: "start", player: "green" },
+    26: { x: 2, y: 12, color: "yellow", type: "path" },
+    27: { x: 3, y: 12, color: "blue", type: "path" },
+    28: { x: 4, y: 13, color: "red", type: "path" },
+    29: { x: 4, y: 14, color: "green", type: "path" },
+    30: { x: 4, y: 15, color: "yellow", type: "path" },
+    31: { x: 5, y: 15, color: "blue", type: "path" },
+    32: { x: 6, y: 15, color: "red", type: "path" },
+    33: { x: 7, y: 15, color: "green", type: "path" },
+    34: { x: 8, y: 15, color: "yellow", type: "goal-entry", player: "yellow" },
+    35: { x: 9, y: 15, color: "blue", type: "path" },
+    36: { x: 10, y: 15, color: "red", type: "path" },
+    37: { x: 11, y: 15, color: "green", type: "path" },
+    38: { x: 12, y: 15, color: "yellow", type: "start", player: "yellow" },
+    39: { x: 12, y: 14, color: "blue", type: "path" },
+    40: { x: 12, y: 13, color: "red", type: "path" },
+    41: { x: 13, y: 12, color: "green", type: "path" },
+    42: { x: 14, y: 12, color: "yellow", type: "path" },
+    43: { x: 15, y: 12, color: "blue", type: "path" },
+    44: { x: 15, y: 11, color: "red", type: "path" },
+    45: { x: 15, y: 10, color: "green", type: "path" },
+    46: { x: 15, y: 9, color: "yellow", type: "path" },
+    47: { x: 15, y: 8, color: "blue", type: "goal-entry", player: "blue" },
+    48: { x: 15, y: 7, color: "red", type: "path" },
+    49: { x: 15, y: 6, color: "green", type: "path" },
+    50: { x: 15, y: 5, color: "yellow", type: "path" },
+    51: { x: 15, y: 4, color: "blue", type: "start", player: "blue" },
+    52: { x: 14, y: 4, color: "red", type: "path" },
+    53: { x: 13, y: 4, color: "green", type: "path" },
+    54: { x: 12, y: 3, color: "yellow", type: "path" },
+    55: { x: 12, y: 2, color: "blue", type: "path" },
+    56: { x: 12, y: 1, color: "red", type: "path" },
+    57: { x: 11, y: 1, color: "green", type: "path" },
+    58: { x: 10, y: 1, color: "yellow", type: "path" },
+    59: { x: 9, y: 1, color: "blue", type: "path" },
+    60: { x: 8, y: 1, color: "red", type: "goal-entry", player: "red" },
+    61: { x: 7, y: 1, color: "green", type: "path" },
+    62: { x: 6, y: 1, color: "yellow", type: "path" },
+    63: { x: 5, y: 1, color: "blue", type: "path" },
+    64: { x: 4, y: 1, color: "red", type: "start", player: "red" },
+    65: { x: 4, y: 2, color: "green", type: "path" },
+    66: { x: 4, y: 3, color: "yellow", type: "path" },
+    67: { x: 3, y: 4, color: "blue", type: "path" },
 
     // 家門通道
     68: { x: 8, y: 2, color: "red", type: "goal-path", player: "red" },
@@ -232,36 +222,38 @@ export const gameEngine = {
         const light = fromFull(fullState);
         const localIdx = parseInt(chessId.split('-')[1]);
         gameRules.move(light, localIdx);
-
-        if (light.pos[12] === 68 || light.pos[13] === 68 || light.pos[14] === 68 || light.pos[15] === 68) {
-            console.log(fullState);
-            console.log(light);
-        }
-        if (light.pos[12] === 69 || light.pos[13] === 69 || light.pos[14] === 69 || light.pos[15] === 69) {
-            console.log(fullState);
-            console.log(light);
-        }
-        if (light.pos[12] === 70 || light.pos[13] === 70 || light.pos[14] === 70 || light.pos[15] === 70) {
-            console.log(fullState);
-            console.log(light);
-        }
-        if (light.pos[12] === 71 || light.pos[13] === 71 || light.pos[14] === 71 || light.pos[15] === 71) {
-            console.log(fullState);
-            console.log(light);
-        }
-        if (light.pos[12] === 72 || light.pos[13] === 72 || light.pos[14] === 72 || light.pos[15] === 72) {
-            console.log(fullState);
-            console.log(light);
-        }
-
         return toFull(light);
+    },
+
+    getBestMove(fullState) {
+        if (fullState.isGameOver || !fullState._movableChessIds?.size) return null;
+
+        const light = fromFull(fullState);
+        const action = gameAI.getBestMove(light);
+
+        const color = gameRules.PLAYER_COLOR[fullState.currentPlayer];
+        const chessId = `${color}-${action.localIdx}`;
+
+        return {
+            type: 'move',
+            chessId: chessId,
+            dice: action.dice
+        };
     },
 
     getPlayerColor(playerIdx) {
         return gameRules.PLAYER_COLOR[playerIdx];
     },
 
+    getAllPlayerColors() {
+        return gameRules.PLAYER_COLOR;
+    },
+
     cloneState(state) {
         return JSON.parse(JSON.stringify(state));
+    },
+
+    setAIIterations(iterations) {
+        gameAI.setIterations(iterations);
     },
 };

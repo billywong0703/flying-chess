@@ -1,6 +1,5 @@
 import MCTSNode from "./MCTSNode";
 import { gameRules, GameState } from "./gameRules";
-import { fromFull } from "./gameEngine";
 
 const ACTION_TYPE = {
     ROLL: 'roll',     // { type: ACTION_TYPE.MOVE, dice: ls.dice, localIdx: i }
@@ -14,19 +13,32 @@ class GameAI {
     }
 
     // 公開 API：傳入原始完整 state，回傳原始格式的動作
-    getBestMove(fullState) {
-        if (fullState.isGameOver || !fullState._movableChessIds?.size) return null;
+    getBestMove(lightState) {
 
         // 1. 建立根節點（輕量狀態）
-        const rootLight = fromFull(fullState);
-        const rootNode = new MCTSNode(rootLight);
+        const rootNode = new MCTSNode(lightState);
+        const currentPlayer = lightState.player;
 
         // 2. 若已經擲過骰子，只考慮當前點數的合法動作
-        if (fullState._lastDiceResult !== 0 && fullState._movableChessIds.size > 0) {
-            rootNode.untriedActions = this._getUniqueActions(rootLight, fullState._lastDiceResult);
+        if (lightState.dice !== 0 && lightState.movable !== 0) {
+            rootNode.untriedActions = this._getUniqueActions(lightState);
         }
 
         // 3. MCTS 主迴圈
+        this._runMCTS(rootNode, currentPlayer);
+
+        // 4. 選出勝率最高的子節點 → 最佳動作
+        const bestChild = rootNode.children.reduce((a, b) => {
+            const aWinRate = a.wins / a.visits;
+            const bWinRate = b.wins / b.visits;
+            return aWinRate > bWinRate ? a : b;
+        });
+
+        // 5. 返回最佳動作
+        return bestChild.action;
+    }
+
+    _runMCTS(rootNode, currentPlayer) {
         for (let i = 0; i < this.iterations; i++) {
             // Selection：從 root 挑一個節點
             let node = this._select(rootNode);
@@ -37,35 +49,18 @@ class GameAI {
             }
 
             // Simulation：隨機玩到結束或達深度上限
-            const winner = this._simulation(node);
+            const winner = this._simulate(node);
 
             // Backpropagation：把結果往上更新
-            const reward = winner === -1 ? 0 : (winner === fullState.currentPlayer ? 1 : -1);
+            const reward = winner === -1 ? 0 : (winner === currentPlayer ? 1 : -1);
             this._backpropagate(node, reward);
         }
-
-        // 4. 選出被訪問最多次的子節點 → 最佳動作
-        if (rootNode.children.length === 0) return null;
-        const bestChild = rootNode.children.reduce((a, b) => a.visits > b.visits ? a : b);
-        const act = bestChild.action;
-
-        // 5. 轉回原始 gameEngine 要求的格式
-        const color = gameRules.PLAYER_COLOR[fullState.currentPlayer];
-        const chessId = `${color}-${act.localIdx}`;
-
-        return {
-            type: 'move',
-            chessId: chessId,
-            dice: act.dice
-        };
     }
 
     _select(node) {
         while (node.isFullyExpanded(this._getUniqueActions.bind(this)) && !node.isTerminal()) {
-            const nextNode = this._bestChild(node);
-            if (!nextNode) {
-                break;
-            }
+            const nextNode = this._getBestChild(node);
+            if (!nextNode) break;
             node = nextNode;
         }
         return node;
@@ -73,131 +68,119 @@ class GameAI {
 
     _expand(node) {
         const action = node.selectUntriedAction(this._getUniqueActions.bind(this));
-        if (!action) {
-            return node;
-        }
+        if (!action) return node;
 
-        const newLs = this._copyLight(node.gameState);
+        const newState = this._cloneState(node.gameState);
+        this._executeAction(newState, action);
 
-        if (action.type === ACTION_TYPE.ROLL && newLs.dice === 0) {
-            gameRules.roll(newLs, action.dice)
-        }
-
-        if (action.type === ACTION_TYPE.MOVE) {
-            gameRules.move(newLs, action.localIdx);
-        }
-
-        return node.addChild(newLs, action);
+        return node.addChild(newState, action);
     }
 
-    _simulation(node) {
-        const ls = this._copyLight(node.gameState);
+    _simulate(node) {
+        const state = this._cloneState(node.gameState);
 
-        if (node.action.type === ACTION_TYPE.MOVE && ls.dice !== 0 && ls.movable !== 0) {
-            gameRules.move(ls, node.action.localIdx);
+        // Execute node action if applicable
+        if (node.action?.type === ACTION_TYPE.MOVE && state.dice !== 0 && state.movable !== 0) {
+            gameRules.move(state, node.action.localIdx);
         }
 
-        for (let d = 0; d < this.maxDepth; d++) {
-            if (ls.winner !== -1) return ls.winner;
+        // Efficient while loop for random playout
+        let depth = 0;
+        while (depth < this.maxDepth && state.winner === -1) {
+            // Roll dice
+            const dice = (Math.random() * 6 | 0) + 1;
+            gameRules.roll(state, dice);
 
-            const dice = Math.floor(Math.random() * 6) + 1;
-            gameRules.roll(ls, dice);
+            // If no moves available, continue to next roll
+            if (state.movable === 0) {
+                depth++;
+                continue;
+            }
 
-            if (ls.movable === 0) continue;
-
-            const mask = ls.movable;
-            if (mask === 0) continue;
-
+            // Find and execute random move
+            const mask = state.movable;
             let choice;
             do {
                 choice = Math.random() * 4 | 0;
             } while (!(mask & (1 << choice)));
 
-            gameRules.move(ls, choice);
+            gameRules.move(state, choice);
+            depth++;
         }
 
-        return ls.winner !== -1 ? ls.winner : -1;
+        return state.winner !== -1 ? state.winner : -1;
     }
 
-    _backpropagate(node, rawReward) {
+    _backpropagate(node, reward) {
         let current = node;
         while (current !== null) {
             const prob = current.action?.probability ?? 1.0;
-
             current.visits += prob;
-            current.wins += rawReward * prob;
-
+            current.wins += reward * prob;
             current = current.parent;
         }
     }
 
     _getUniqueActions(ls) {
-        // Case 1: 已擲骰（dice > 0），且有可移動的棋子 → 產生唯一的移動動作（相同終點位置視為等價）
-        if (ls.dice !== 0 && ls.movable !== 0) {
-            const seenPositions = new Set();
-            const base = ls.player * 4;
-            const actions = [];
-
-            for (let i = 0; i < 4; i++) {
-                if ((ls.movable & (1 << i)) === 0) continue;
-
-                const target = ls.st[base + i] === 0 ? 'home' : ls.pos[base + i];
-                if (!seenPositions.has(target)) {
-                    seenPositions.add(target);
-                    actions.push({ type: ACTION_TYPE.MOVE, dice: ls.dice, localIdx: i });
-                }
-            }
-            return actions;
-        }
-
-        // Case 2: 尚未擲骰 → 計算每個骰子面（1~6）擲出後是否導致「完全相同的下一狀態」
-        // 只有在 dice=1~5 且完全無法移動的情況下，才視為等價狀態（擲哪個都一樣）
-        // 擲 6 永遠不會被合併，因為連續三次 6 會觸發特殊規則
-        const resultCount = new Map(); // key: 代表性 dice 值（或 -1 表示「無移動」群組），value: 出現次數
-
-        for (let d = 1; d <= 6; d++) {
-            const next = this._copyLight(ls);
-            gameRules.roll(next, d);
-
-            if (d !== 6 && next.dice === 0 && next.movable === 0) {
-                // 1~5 且完全不能走 → 合併到同一個代表動作
-                resultCount.set(-1, (resultCount.get(-1) || 0) + 1);
-            } else {
-                // 正常情況或擲到 6 → 各自獨立
-                resultCount.set(d, (resultCount.get(d) || 0) + 1);
-            }
-        }
-
-        const actions = [];
-        for (const [reprDice, count] of resultCount) {
-            const actualDice = reprDice === -1 ? null : reprDice; // 或選擇 1~5 其中任一作為代表值
-            actions.push({
-                type: ACTION_TYPE.ROLL,
-                dice: actualDice,
-                probability: count / 6
-            });
-        }
-
-        return actions;
+        return ls.dice !== 0 && ls.movable !== 0 ? this._getMoves(ls) : this._getRolls(ls);
     }
 
-    _bestChild(node) {
-        // 根據當前遊戲狀態判斷節點類型，而不是根據 action
-        const isChanceNode = node.gameState.dice === 0 && node.gameState.movable === 0;
+    _getMoves(ls) {
+        const seen = new Set();
+        const base = ls.player * 4;
+        const moves = [];
 
-        if (isChanceNode) {
-            // 🎲 機會節點：按機率隨機選擇
-            const random = Math.random();
-            let cumulative = 0;
+        for (let i = 0; i < 4; i++) {
+            if ((ls.movable & (1 << i)) === 0) continue;
+
+            const idx = base + i;
+            const target = ls.st[idx] === 0 ? 'home' : ls.pos[idx];
+
+            if (!seen.has(target)) {
+                seen.add(target);
+                moves.push({
+                    type: ACTION_TYPE.MOVE,
+                    dice: ls.dice,
+                    localIdx: i
+                });
+            }
+        }
+        return moves;
+    }
+
+    _getRolls(ls) {
+        const counts = new Map();
+
+        for (let dice = 1; dice <= 6; dice++) {
+            const test = this._cloneState(ls);
+            gameRules.roll(test, dice);
+
+            if (dice !== 6 && test.dice === 0 && test.movable === 0) {
+                counts.set(-1, (counts.get(-1) || 0) + 1);
+            } else {
+                counts.set(dice, (counts.get(dice) || 0) + 1);
+            }
+        }
+
+        return Array.from(counts, ([dice, count]) => ({
+            type: ACTION_TYPE.ROLL,
+            dice: dice === -1 ? null : dice,
+            probability: count / 6
+        }));
+    }
+
+    _getBestChild(node) {
+        const isChance = node.gameState.dice === 0 && node.gameState.movable === 0;
+
+        if (isChance) {
+            const rand = Math.random();
+            let prob = 0;
             for (const child of node.children) {
-                cumulative += child.action?.probability ?? 1.0 / node.children.length;
-                if (random <= cumulative) {
-                    return child;
-                }
+                prob += child.action?.probability ?? 1.0 / node.children.length;
+                if (rand <= prob) return child;
             }
             return node.children[0];
         } else {
-            // 🎯 決策節點：使用 UCT
             let bestScore = -Infinity;
             let bestChild = null;
 
@@ -212,18 +195,26 @@ class GameAI {
         }
     }
 
-
-    _copyLight(ls) {
-        const n = new GameState();
-        n.pos.set(ls.pos);
-        n.st.set(ls.st);
-        n.player = ls.player;
-        n.six = ls.six;
-        n.winner = ls.winner;
-        n.dice = ls.dice;
-        n.movable = ls.movable;
-        return n;
+    _executeAction(state, action) {
+        if (action.type === ACTION_TYPE.ROLL && state.dice === 0) {
+            gameRules.roll(state, action.dice);
+        } else if (action.type === ACTION_TYPE.MOVE) {
+            gameRules.move(state, action.localIdx);
+        }
     }
+
+    _cloneState(ls) {
+        const clone = new GameState();
+        clone.pos.set(ls.pos);
+        clone.st.set(ls.st);
+        clone.player = ls.player;
+        clone.six = ls.six;
+        clone.winner = ls.winner;
+        clone.dice = ls.dice;
+        clone.movable = ls.movable;
+        return clone;
+    }
+
 
     setIterations(n) { this.iterations = n; }
 }

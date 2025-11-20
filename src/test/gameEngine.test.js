@@ -47,7 +47,7 @@ describe('飛行棋遊戲引擎', () => {
 
             const redChess = state.players.red[0]
             expect(redChess.state).toBe('path')
-            expect(redChess.position).toBe(16) // 65 + 3
+            expect(redChess.position).toBe(67) // 65 + 3
         })
     })
 })

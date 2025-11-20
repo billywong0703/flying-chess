@@ -1,5 +1,5 @@
 // gameAI.worker.js
-import { gameAI } from '../engine/gameAI';
+import { gameEngine } from '../engine/gameEngine';
 
 // 延遲工具函數
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -19,7 +19,7 @@ const executeWithMinDelay = async (fn, minDelay = 200) => {
 
 export const getBestMove = async (gameState) => {
     return executeWithMinDelay(
-        () => gameAI.getBestMove(gameState),
+        () => gameEngine.getBestMove(gameState),
         200
     );
 };

@@ -1,7 +1,7 @@
 import React from "react";
 import "./PlayerStatusGrid.css";
 
-const PlayerStatusGrid = ({ currentPlayer, playersChess, gameConfig }) => {
+const PlayerStatusGrid = ({ currentPlayer, playersChess, playerOrder }) => {
   /**
    * 🎯 獲取玩家狀態摘要
    */
@@ -15,13 +15,13 @@ const PlayerStatusGrid = ({ currentPlayer, playersChess, gameConfig }) => {
     return { atHome, onPath, inGoalPath, atGoal };
   };
 
-  const currentColor = gameConfig.PLAYER_ORDER[currentPlayer];
+  const currentColor = playerOrder[currentPlayer];
 
   return (
     <div className="panel-section">
       <h3>📊 玩家狀態</h3>
       <div className="player-status-grid">
-        {gameConfig.PLAYER_COLORS.map((color) => {
+        {playerOrder.map((color) => {
           const status = getPlayerStatus(color);
           return (
             <div key={color} className={`player-status ${color} ${color === currentColor ? "active" : ""}`}>

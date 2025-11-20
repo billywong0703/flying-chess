@@ -1,12 +1,11 @@
-import React from "react";
 import "./CurrentPlayerDisplay.css";
 
-const CurrentPlayerDisplay = ({ currentPlayer, playersChess, gameConfig, isAITurn, aiPlayers }) => {
+const CurrentPlayerDisplay = ({ currentPlayer, playersChess, playerOrder, isAITurn, aiPlayers }) => {
   /**
    * 🏆 檢查勝利條件
    */
   const checkWinner = () => {
-    for (const color of gameConfig.PLAYER_COLORS) {
+    for (const color of playerOrder) {
       const player = playersChess[color];
       const allAtGoal = player.every((chess) => chess.state === "goal");
       if (allAtGoal) {
@@ -16,7 +15,7 @@ const CurrentPlayerDisplay = ({ currentPlayer, playersChess, gameConfig, isAITur
     return null;
   };
 
-  const currentColor = gameConfig.PLAYER_ORDER[currentPlayer];
+  const currentColor = playerOrder[currentPlayer];
   const winner = checkWinner();
 
   // 檢查當前玩家是否為AI

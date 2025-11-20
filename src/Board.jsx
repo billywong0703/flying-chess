@@ -7,7 +7,7 @@ import CurrentPlayerDisplay from "./CurrentPlayerDisplay";
 import PlayerStatusGrid from "./PlayerStatusGrid";
 import ActionLog from "./ActionLog";
 import VictoryScreen from "./VictoryScreen";
-import { gameEngine, PATH_MAP, GAME_CONFIG } from "./engine/gameEngine";
+import { gameEngine, PATH_MAP } from "./engine/gameEngine";
 
 // eslint-disable-next-line no-undef
 const aiWorker = new ComlinkWorker(new URL("./workers/gameAI.worker.js", import.meta.url));
@@ -15,6 +15,7 @@ const aiWorker = new ComlinkWorker(new URL("./workers/gameAI.worker.js", import.
 const Board = () => {
   // 🎮 遊戲狀態
   const [gameState, setGameState] = useState(() => gameEngine.createInitialState());
+  const playerOrder = gameEngine.getAllPlayerColors();
 
   // ✨ UI 狀態
   const [highlightedChessIds, setHighlightedChessIds] = useState(new Set());
@@ -83,15 +84,6 @@ const Board = () => {
 
     let newGameState = gameEngine.rollDice(gameState, diceResult);
 
-    // 處理擲骰子後的狀態
-    if (newGameState._lastAction === "penalty") {
-      addLog(`⚡ ${currentPlayerColor} AI 連續三次擲出 6！所有飛機返回基地！`, "penalty");
-    }
-
-    if (newGameState._lastAction === "no_movable_chess") {
-      addLog(`❌ ${currentPlayerColor} AI 沒有可以移動的飛機`, "info");
-    }
-
     if (newGameState._movableChessIds && newGameState._movableChessIds.size > 0) {
       const action = await aiWorker.getBestMove(newGameState);
 
@@ -103,7 +95,7 @@ const Board = () => {
         if (cellInfo.type === "goal") {
           addLog(`🎉 ${currentPlayerColor} AI 的飛機到達終點！`, "goal");
         } else {
-          addLog(`➡️ ${currentPlayerColor} AI 移動了飛機`, "move");
+          addLog(`➡️ ${currentPlayerColor} AI 移動了飛機 ${action.localidx}`, "move");
         }
       }
     } else {
@@ -126,24 +118,11 @@ const Board = () => {
 
     const newGameState = gameEngine.rollDice(gameState, diceResult);
 
-    switch (newGameState._lastAction) {
-      case "penalty":
-        addLog(`⚡ ${playerColor} 玩家連續三次擲出 6！所有飛機返回基地！`, "penalty");
-        break;
-      case "no_movable_chess":
-        addLog(`❌ ${playerColor} 玩家沒有可以移動的飛機，輪到下一位玩家`, "info");
-        break;
-      default:
-        addLog(`✅ ${playerColor} 玩家有 ${newGameState._movableChessIds.size} 架飛機可以移動`, "info");
-        break;
-    }
-
     syncUIWithGameState(newGameState);
   };
 
   const handleChessClick = (chessId) => {
     if (gameState.isGameOver || isAITurn) return;
-    if (!gameEngine.isValidMove(gameState, chessId)) return;
 
     const [playerColor] = chessId.split("-");
     const newGameState = gameEngine.moveChess(gameState, chessId);
@@ -206,13 +185,11 @@ const Board = () => {
   return (
     <div className="game-container">
       {showVictoryScreen && <VictoryScreen winner={gameState.winner} onRestart={resetGame} />}
-
       <div className="game-controls">
         <Dice onRoll={handleDiceRoll} disabled={isDiceDisabled || gameState.isGameOver || isAITurn} />
-        <CurrentPlayerDisplay currentPlayer={gameState.currentPlayer} playersChess={gameState.players} gameConfig={GAME_CONFIG} isAITurn={isAITurn} aiPlayers={aiPlayers.current} />
-        <PlayerStatusGrid currentPlayer={gameState.currentPlayer} playersChess={gameState.players} gameConfig={GAME_CONFIG} aiPlayers={aiPlayers.current} />
+        <CurrentPlayerDisplay currentPlayer={gameState.currentPlayer} playersChess={gameState.players} playerOrder={playerOrder} isAITurn={isAITurn} aiPlayers={aiPlayers.current} />
+        <PlayerStatusGrid currentPlayer={gameState.currentPlayer} playersChess={gameState.players} playerOrder={playerOrder} aiPlayers={aiPlayers.current} />
       </div>
-
       <div className="game-board">
         <div className="container">
           <PlayerBoardSpace color="red" gridArea="1 / 4 / 4 / 1" />
@@ -233,7 +210,6 @@ const Board = () => {
           )}
         </div>
       </div>
-
       <div className="game-controls" style={{ minWidth: 300 }}>
         <ActionLog playerLog={playerLog} />
       </div>

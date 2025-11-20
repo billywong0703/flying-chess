@@ -1,6 +1,3 @@
-import { PATH_MAP } from "./gameEngine";
-
-
 export class GameState {
     // 如果 dice = 0 和 movable = 0 的話，代表(狀態 = 等待擲骰)，否則(狀態 = 等待行動)
     constructor() {
@@ -17,8 +14,8 @@ export class GameState {
 export const gameRules = {
     // 各顏色起飛點、入口、家門通道起點
     PLAYER_COLOR: ['red', 'blue', 'green', 'yellow'],
-    START: { 0: 65, 1: 52, 2: 26, 3: 39 },
-    GOAL_ENTRY: { 0: 61, 1: 48, 2: 22, 3: 35 },
+    START: { 0: 64, 1: 51, 2: 25, 3: 38 },
+    GOAL_ENTRY: { 0: 60, 1: 47, 2: 21, 3: 34 },
     GOAL_PATH_START: { 0: 68, 1: 86, 2: 80, 3: 74 },
     RING_SIZE: 52,
     RING_START: 16,
@@ -29,8 +26,7 @@ export const gameRules = {
         ls.dice = dice;
         const p = ls.player;
         const base = p * 4;
-        let sixCount = ls.six;
-        sixCount = dice === 6 ? sixCount + 1 : 0;
+        let sixCount = dice === 6 ? ls.six + 1 : 0;
 
         // 連續三個6 → 所有在跑道上的棋子飛回基地
         if (sixCount === 3) {
@@ -51,7 +47,7 @@ export const gameRules = {
         for (let i = 0; i < 4; i++) {
             const s = ls.st[base + i];
             if ((s === 0 && dice === 6) || s === 1 || s === 2) {
-                movable |= (1 << i);                      // 第 i 顆棋子可移動
+                movable |= (1 << i);
             }
         }
 
@@ -103,8 +99,8 @@ export const gameRules = {
                 st = 1;
 
                 // 跳躍規則：踩到自己顏色的格子（不包含入口格）
-                if (pos !== entry && PATH_MAP[pos]?.color === this.PLAYER_COLOR[p]) {
-                    pos = this.RING_START + (nextPos - this.RING_START + dice) % this.RING_SIZE;
+                if (pos !== entry && pos % 4 === p) {
+                    pos = this.RING_START + (nextPos - this.RING_START + 4) % this.RING_SIZE;
                 }
             }
         }
@@ -113,12 +109,12 @@ export const gameRules = {
             const goalEnd = this.GOAL_PATH_START[p] + 5;   // 真正的終點格編號（如 red 是 73）
 
             if (pos + dice < goalEnd) {
-                // 正常往前走，不可能到家
+                // 正常往前走
                 pos += dice;
                 st = 2;
             }
             else if (pos + dice === goalEnd) {
-                // 剛好！完美進家
+                // 進家
                 pos = 255;
                 st = 3;
             }
@@ -169,16 +165,16 @@ export const gameRules = {
         const used = new Set();
         for (let i = 0; i < 4; i++) {
             const idx = base + i;
-            if (ls.st[idx] === 0) {  // 只有在家區的才算佔位
-                used.add(ls.pos[idx] - base);  // 轉成 local 0~3
+            if (ls.st[idx] === 0) {
+                used.add(ls.pos[idx] - base);
             }
         }
         for (let local = 0; local < 4; local++) {
             if (!used.has(local)) {
-                return base + local;  // 回傳全局家區位置 (0~15)
+                return base + local;
             }
         }
-        return -1; // 不應該發生（表示家滿了）
+        return -1;
     },
 
     _willPassGoalEntry(currentPos, newPos, entryPos) {
@@ -200,7 +196,6 @@ export const gameRules = {
         return this.RING_SIZE - currentPos + this.RING_START + (entryPos - this.RING_START);
     },
 
-    // 檢查是否有人四顆棋全到終點
     _checkWin(ls) {
         const base = ls.player * 4;
 
