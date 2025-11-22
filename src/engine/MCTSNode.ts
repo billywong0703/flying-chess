@@ -1,85 +1,98 @@
-/**
- * MCTS節點類 - 表示遊戲狀態樹中的一個節點
- */
+import { GameState } from "./gameRules";
+import { GameAction } from "./gameAI";
+
 class MCTSNode {
-    constructor(gameState, parent = null, action = null) {
-        this.gameState = gameState;      // 🎮 當前遊戲狀態
-        this.parent = parent;            // 👨‍👦 父節點引用
-        this.action = action;            // 🎯 導致此節點的動作
-        this.children = [];              // 🌱 子節點列表
-        this.visits = 0;                 // 📊 節點訪問次數
-        this.wins = 0;                   // 🏆 節點勝利次數/累積獎勵
-        this.untriedActions = null;      // 📦 尚未嘗試的動作列表
+  public gameState: GameState; // 🎮 Current game state
+  public parent: MCTSNode | null; // 👨‍👦 Parent node reference
+  public action: GameAction | null; // 🎯 Action that led to this node
+  public children: MCTSNode[]; // 🌱 Child node list
+  public visits: number; // 📊 Node visit count
+  public wins: number; // 🏆 Node win count/cumulative reward
+  public untriedActions: GameAction[] | null; // 📦 List of untried actions
+
+  constructor(gameState: GameState, parent: MCTSNode | null = null, action: GameAction | null = null) {
+    this.gameState = gameState;
+    this.parent = parent;
+    this.action = action;
+    this.children = [];
+    this.visits = 0;
+    this.wins = 0;
+    this.untriedActions = null;
+  }
+
+  isFullyExpanded(getActionsCallback: ((state: GameState) => GameAction[]) | null = null): boolean {
+    if (this.untriedActions === null) {
+      if (getActionsCallback) {
+        this.untriedActions = getActionsCallback(this.gameState);
+      } else {
+        // If no callback provided, assume no actions available
+        this.untriedActions = [];
+      }
+    }
+    return this.untriedActions.length === 0;
+  }
+
+  isTerminal(): boolean {
+    return this.gameState.winner !== -1;
+  }
+
+  selectUntriedAction(getActionsCallback: ((state: GameState) => GameAction[]) | null = null): GameAction | null {
+    // If not initialized, get legal actions first
+    if (this.untriedActions === null) {
+      if (getActionsCallback) {
+        this.untriedActions = getActionsCallback(this.gameState);
+      } else {
+        this.untriedActions = [];
+      }
     }
 
-    /**
-     * ✅ 檢查節點是否完全擴展
-     */
-    isFullyExpanded(getActionsCallback = null) {
-        if (this.untriedActions === null) {
-            this.untriedActions = getActionsCallback(this.gameState);
-        }
-        return this.untriedActions.length === 0;
+    // If no untried actions, return null
+    if (this.untriedActions.length === 0) {
+      return null;
     }
 
-    /**
-     * 🏁 檢查節點是否為終止狀態（遊戲結束）
-     */
-    isTerminal() {
-        return this.gameState.isGameOver;
+    // Take an action from untried actions list (LIFO)
+    return this.untriedActions.pop() || null;
+  }
+
+  getUCTScore(totalVisits: number, explorationParam: number = 1.414): number {
+    // If node has never been visited, return maximum score to encourage exploration
+    if (this.visits === 0) {
+      return Number.MAX_VALUE;
     }
 
-    /**
-     * 🎲 從未嘗試的動作中選擇一個動作
-     */
-    selectUntriedAction(getActionsCallback = null) {
-        // 如果未初始化，先獲取合法動作
-        if (this.untriedActions === null) {
-            this.untriedActions = getActionsCallback(this.gameState);
-        }
+    // Exploitation term: current node's win rate
+    const exploitation = this.wins / this.visits;
+    // Exploration term: encourage less visited nodes
+    const exploration = explorationParam * Math.sqrt(Math.log(totalVisits) / this.visits);
 
-        // 如果沒有未嘗試的動作，返回null
-        if (this.untriedActions.length === 0) {
-            return null;
-        }
+    return exploitation + exploration;
+  }
 
-        // 從未嘗試動作列表中取出一個動作（後進先出）
-        return this.untriedActions.pop();
+  addChild(gameState: GameState, action: GameAction): MCTSNode {
+    const childNode = new MCTSNode(gameState, this, action);
+    this.children.push(childNode);
+    return childNode;
+  }
+
+  update(result: number): void {
+    this.visits += 1; // Increase visit count
+    this.wins += result; // Accumulate reward
+  }
+
+  getBestChild(): MCTSNode | null {
+    if (this.children.length === 0) {
+      return null;
     }
 
-    /**
-     * 📈 計算UCT（上限置信區間）分數
-     */
-    getUCTScore(totalVisits, explorationParam = 1.414) {
-        // 如果節點從未被訪問過，返回最大分數以鼓勵探索
-        if (this.visits === 0) {
-            return Number.MAX_VALUE;
-        }
+    return this.children.reduce((best, current) => {
+      return current.visits > best.visits ? current : best;
+    });
+  }
 
-        // 開發項：當前節點的勝率
-        const exploitation = this.wins / this.visits;
-        // 探索項：鼓勵訪問次數較少的節點
-        const exploration = explorationParam * Math.sqrt(Math.log(totalVisits) / this.visits);
-
-        return exploitation + exploration;
-    }
-
-    /**
-     * 👶 添加子節點
-     */
-    addChild(gameState, action) {
-        const childNode = new MCTSNode(gameState, this, action);
-        this.children.push(childNode);
-        return childNode;
-    }
-
-    /**
-     * 📊 更新節點統計信息
-     */
-    update(result) {
-        this.visits += 1;    // 增加訪問次數
-        this.wins += result; // 累積獎勵
-    }
+  toString(): string {
+    return `MCTSNode[visits: ${this.visits}, wins: ${this.wins}, winRate: ${this.visits > 0 ? (this.wins / this.visits).toFixed(3) : 0}, children: ${this.children.length}]`;
+  }
 }
 
 export default MCTSNode;

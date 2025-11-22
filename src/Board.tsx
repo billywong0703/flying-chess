@@ -1,4 +1,4 @@
-// Board.js - 修改版本
+// Board.tsx - TypeScript version
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./Board.css";
 import Chess from "./Chess";
@@ -8,39 +8,59 @@ import PlayerStatusGrid from "./PlayerStatusGrid";
 import ActionLog from "./ActionLog";
 import VictoryScreen from "./VictoryScreen";
 import { gameEngine, PATH_MAP } from "./engine/gameEngine";
+import { GameAIWorkerAPI } from "./workers/gameAI.worker";
+import { wrap } from "comlink";
 
-// eslint-disable-next-line no-undef
-const aiWorker = new ComlinkWorker(new URL("./workers/gameAI.worker.js", import.meta.url));
+interface LogEntry {
+  id: number;
+  message: string;
+  type: string;
+  timestamp: string;
+}
 
-const Board = () => {
-  // 🎮 遊戲狀態
+interface ChessPieceProps {
+  chess: {
+    id: string;
+    state: string;
+    position: number;
+  };
+  color: string;
+  isHighlighted: boolean;
+  onChessClick: (chessId: string) => void;
+  isAITurn: boolean;
+}
+
+const Board: React.FC = () => {
+  const aiWorkerRef = useRef<ReturnType<typeof wrap<GameAIWorkerAPI>> | null>(null);
+
+  // 🎮 Game state
   const [gameState, setGameState] = useState(() => gameEngine.createInitialState());
   const playerOrder = gameEngine.getAllPlayerColors();
 
-  // ✨ UI 狀態
-  const [highlightedChessIds, setHighlightedChessIds] = useState(new Set());
+  // ✨ UI state
+  const [highlightedChessIds, setHighlightedChessIds] = useState<Set<string>>(new Set());
   const [isDiceDisabled, setIsDiceDisabled] = useState(false);
   const [showVictoryScreen, setShowVictoryScreen] = useState(false);
   const [isAITurn, setIsAITurn] = useState(false);
 
-  // 📝 玩家資訊記錄
-  const [playerLog, setPlayerLog] = useState([]);
+  // 📝 Player info log
+  const [playerLog, setPlayerLog] = useState<LogEntry[]>([]);
   const logId = useRef(0);
 
-  // 🎯 AI配置 - 定義哪些玩家是AI
-  const aiPlayers = useRef({
-    red: true, // 紅色玩家
-    yellow: true, // 黃色玩家
-    green: true, // 綠色玩家
-    blue: true, // 藍色玩家
+  // 🎯 AI configuration - define which players are AI
+  const aiPlayers = useRef<Record<string, boolean>>({
+    red: true, // Red player
+    yellow: true, // Yellow player
+    green: true, // Green player
+    blue: true, // Blue player
   });
 
   // ===========================================================================
-  // 工具函數
+  // Utility functions
   // ===========================================================================
 
-  const addLog = (message, type = "info") => {
-    const newLog = {
+  const addLog = (message: string, type: string = "info") => {
+    const newLog: LogEntry = {
       id: logId.current++,
       message,
       type,
@@ -50,7 +70,7 @@ const Board = () => {
   };
 
   const syncUIWithGameState = useCallback(
-    (newGameState) => {
+    (newGameState: typeof gameState) => {
       setGameState(newGameState);
       setHighlightedChessIds(newGameState._movableChessIds || new Set());
 
@@ -59,43 +79,44 @@ const Board = () => {
 
       if (newGameState.isGameOver && newGameState.winner) {
         setShowVictoryScreen(true);
-        addLog(`🎉 ${newGameState.winner} 玩家獲得了遊戲勝利！`, "victory");
+        addLog(`🎉 ${newGameState.winner} player won the game!`, "victory");
       }
     },
     [isAITurn]
   );
 
   // ===========================================================================
-  // AI回合處理
+  // AI turn handling
   // ===========================================================================
 
   /**
-   * 🤖 處理AI回合
+   * 🤖 Handle AI turn
    */
   const handleAITurn = useCallback(async () => {
     if (gameState.isGameOver || !isAITurn) return;
 
     const currentPlayerColor = gameEngine.getPlayerColor(gameState.currentPlayer);
-    addLog(`🤖 ${currentPlayerColor} AI 正在思考...`, "info");
+    addLog(`🤖 ${currentPlayerColor} AI is thinking...`, "info");
 
-    // AI擲骰子
+    // AI rolls dice
     const diceResult = Math.floor(Math.random() * 6) + 1;
-    addLog(`🎲 ${currentPlayerColor} AI 擲出 ${diceResult} 點`, "roll");
+    addLog(`🎲 ${currentPlayerColor} AI rolled ${diceResult}`, "roll");
 
     let newGameState = gameEngine.rollDice(gameState, diceResult);
 
     if (newGameState._movableChessIds && newGameState._movableChessIds.size > 0) {
-      const action = await aiWorker.getBestMove(newGameState);
+      const action = await aiWorkerRef.current!.getBestMove(newGameState);
 
       if (action) {
         newGameState = gameEngine.moveChess(newGameState, action.chessId);
 
-        const cellInfo = PATH_MAP[newGameState.players[currentPlayerColor].find((chess) => chess.id === action.chessId).position];
+        const movedChess = newGameState.players[currentPlayerColor].find((chess: any) => chess.id === action.chessId);
+        const cellInfo = PATH_MAP[movedChess!.position];
 
         if (cellInfo.type === "goal") {
-          addLog(`🎉 ${currentPlayerColor} AI 的飛機到達終點！`, "goal");
+          addLog(`🎉 ${currentPlayerColor} AI's plane reached the goal!`, "goal");
         } else {
-          addLog(`➡️ ${currentPlayerColor} AI 移動了飛機 ${action.chessId}`, "move");
+          addLog(`➡️ ${currentPlayerColor} AI moved plane ${action.chessId}`, "move");
         }
       }
     } else {
@@ -107,38 +128,31 @@ const Board = () => {
   }, [gameState, isAITurn, syncUIWithGameState]);
 
   // ===========================================================================
-  // 遊戲操作處理函數
+  // Game operation handling functions
   // ===========================================================================
 
-  const handleDiceRoll = (diceResult) => {
+  const handleDiceRoll = (diceResult: number) => {
     if (isDiceDisabled || gameState.isGameOver || isAITurn) return;
 
     const playerColor = gameEngine.getPlayerColor(gameState.currentPlayer);
-    addLog(`🎲 ${playerColor} 玩家擲出 ${diceResult} 點`, "roll");
+    addLog(`🎲 ${playerColor} player rolled ${diceResult}`, "roll");
 
     const newGameState = gameEngine.rollDice(gameState, diceResult);
-
     syncUIWithGameState(newGameState);
   };
 
-  const handleChessClick = (chessId) => {
+  const handleChessClick = (chessId: string) => {
     if (gameState.isGameOver || isAITurn) return;
 
     const [playerColor] = chessId.split("-");
     const newGameState = gameEngine.moveChess(gameState, chessId);
-    const cellInfo = gameEngine.getCellInfo(newGameState.players[playerColor].find((chess) => chess.id === chessId).position);
+    const movedChess = newGameState.players[playerColor].find((chess: any) => chess.id === chessId);
+    const cellInfo = PATH_MAP[movedChess!.position];
 
-    switch (newGameState._lastAction) {
-      case "move":
-        if (cellInfo.type === "goal") {
-          addLog(`🎉 ${playerColor} 玩家的飛機到達終點！`, "goal");
-        } else {
-          addLog(`➡️ ${playerColor} 玩家移動 ${gameState._lastDiceResult} 步`, "move");
-        }
-        break;
-      default:
-        addLog(`🛫 ${playerColor} 玩家的飛機從基地起飛！`, "move");
-        break;
+    if (cellInfo.type === "goal") {
+      addLog(`🎉 ${playerColor} player's plane reached the goal!`, "goal");
+    } else {
+      addLog(`➡️ ${playerColor} player moved plane ${chessId}`, "move");
     }
 
     syncUIWithGameState(newGameState);
@@ -149,15 +163,15 @@ const Board = () => {
     syncUIWithGameState(newGameState);
     setPlayerLog([]);
     setShowVictoryScreen(false);
-    addLog("🔄 遊戲已重置，開始新遊戲！", "info");
+    addLog("🔄 Game has been reset, starting new game!", "info");
   };
 
   // ===========================================================================
-  // 效果鉤子
+  // Effect hooks
   // ===========================================================================
 
   /**
-   * 🔄 監聽遊戲狀態變化，觸發AI回合
+   * 🔄 Listen for game state changes, trigger AI turn
    */
   useEffect(() => {
     if (gameState.isGameOver) return;
@@ -178,8 +192,19 @@ const Board = () => {
     setIsDiceDisabled(gameState.isGameOver || isAITurn);
   }, [gameState._movableChessIds, gameState.currentPlayer, gameState.isGameOver, isAITurn]);
 
+  useEffect(() => {
+    const worker = new Worker(new URL("./workers/gameAI.worker.ts", import.meta.url), {
+      type: "module",
+    });
+
+    aiWorkerRef.current = wrap<GameAIWorkerAPI>(worker);
+
+    return () => {
+      worker.terminate();
+    };
+  }, []);
   // ===========================================================================
-  // 畫面渲染
+  // Render
   // ===========================================================================
 
   return (
@@ -188,7 +213,7 @@ const Board = () => {
       <div className="game-controls">
         <Dice onRoll={handleDiceRoll} disabled={isDiceDisabled || gameState.isGameOver || isAITurn} />
         <CurrentPlayerDisplay currentPlayer={gameState.currentPlayer} playersChess={gameState.players} playerOrder={playerOrder} isAITurn={isAITurn} aiPlayers={aiPlayers.current} />
-        <PlayerStatusGrid currentPlayer={gameState.currentPlayer} playersChess={gameState.players} playerOrder={playerOrder} aiPlayers={aiPlayers.current} />
+        <PlayerStatusGrid currentPlayer={gameState.currentPlayer} playersChess={gameState.players} playerOrder={playerOrder} />
       </div>
       <div className="game-board">
         <div className="container">
@@ -204,7 +229,7 @@ const Board = () => {
             ))}
 
           {Object.entries(gameState.players).map(([color, chessList]) =>
-            chessList.map((chess) => (
+            (chessList as any[]).map((chess) => (
               <ChessPiece key={chess.id} chess={chess} color={color} isHighlighted={highlightedChessIds.has(chess.id) && !isAITurn} onChessClick={handleChessClick} isAITurn={isAITurn} />
             ))
           )}
@@ -217,7 +242,7 @@ const Board = () => {
   );
 };
 
-const ChessPiece = ({ chess, color, isHighlighted, onChessClick, isAITurn }) => {
+const ChessPiece: React.FC<ChessPieceProps> = ({ chess, color, isHighlighted, onChessClick, isAITurn }) => {
   const cell = PATH_MAP[chess.position];
   if (!cell) return null;
 
@@ -231,7 +256,7 @@ const ChessPiece = ({ chess, color, isHighlighted, onChessClick, isAITurn }) => 
 
   const homeBaseStyle = isInHomeBase
     ? {
-        position: "relative",
+        position: "relative" as const,
         ...homeBaseOffsets[chess.position % 4],
       }
     : {};
@@ -252,18 +277,18 @@ const ChessPiece = ({ chess, color, isHighlighted, onChessClick, isAITurn }) => 
   );
 };
 
-const Cell = ({ color = "", x, y }) => (
+const Cell: React.FC<{ color?: string; x: number; y: number }> = ({ color = "", x, y }) => (
   <div className={`cell ${color}`} style={{ gridRow: x, gridColumn: y }}>
     <div className="circle"></div>
   </div>
 );
 
-const PlayerBoardSpace = ({ color = "", gridArea }) => (
+const PlayerBoardSpace: React.FC<{ color: string; gridArea: string }> = ({ color = "", gridArea }) => (
   <div className={`player-space ${color}`} style={{ gridArea }}>
-    <Cell x="1" y="1" />
-    <Cell x="1" y="2" />
-    <Cell x="2" y="1" />
-    <Cell x="2" y="2" />
+    <Cell x={1} y={1} />
+    <Cell x={1} y={2} />
+    <Cell x={2} y={1} />
+    <Cell x={2} y={2} />
   </div>
 );
 
