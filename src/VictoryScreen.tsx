@@ -1,17 +1,12 @@
 import "./VictoryScreen.css";
+import {} from "./engine/gameEngine";
 
-// =============================================================================
-// Victory Screen Component
-// =============================================================================
-const VictoryScreen = ({ winner, onRestart }) => {
-  // Victory celebration messages for each color
-  const victoryMessages = {
-    red: "🎉 Congratulations to Red Player for the Victory!",
-    yellow: "🎉 Yellow Player Wins the Championship!",
-    green: "🎉 Green Player Shows Exceptional Flying Skills!",
-    blue: "🎉 Blue Player Successfully Reaches the Finish Line!",
-  };
+interface VictoryScreenProps {
+  winner: string;
+  onRestart: () => void;
+}
 
+const VictoryScreen: React.FC<VictoryScreenProps> = ({ winner, onRestart }) => {
   return (
     <div className="victory-overlay">
       <div className="victory-modal">
@@ -25,7 +20,7 @@ const VictoryScreen = ({ winner, onRestart }) => {
             <div className="winner-color">{winner}</div>
           </div>
 
-          <div className="victory-message">{victoryMessages[winner]}</div>
+          <div className="victory-message">Congratulations to {winner} Player for the Victory!</div>
 
           <div className="celebration">
             <div className="confetti">🎊</div>

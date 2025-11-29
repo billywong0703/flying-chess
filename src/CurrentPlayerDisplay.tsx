@@ -12,7 +12,7 @@ interface CurrentPlayerDisplayProps {
 const CurrentPlayerDisplay: React.FC<CurrentPlayerDisplayProps> = ({ currentPlayer, playersChess, playerOrder, isAITurn, aiPlayers }) => {
   const currentColor = playerOrder[currentPlayer];
 
-  const winner = () => {
+  const getWinner = () => {
     for (const color of playerOrder) {
       const player = playersChess[color];
       const allAtGoal = player.every((chess: Piece) => chess.state === "goal");
@@ -23,6 +23,8 @@ const CurrentPlayerDisplay: React.FC<CurrentPlayerDisplayProps> = ({ currentPlay
     return null;
   };
 
+  const winner = getWinner();
+
   const isCurrentPlayerAI = aiPlayers && aiPlayers[currentColor];
 
   const playerDisplayName = isCurrentPlayerAI ? `🤖 ${currentColor} AI` : `👤 ${currentColor} Player`;
@@ -30,7 +32,7 @@ const CurrentPlayerDisplay: React.FC<CurrentPlayerDisplayProps> = ({ currentPlay
   return (
     <div className="panel-section current-player-section">
       {winner ? (
-        <div className="victory-message">🏆 {winner()} Player Wins!</div>
+        <div className="victory-message">🏆 {winner} Player Wins!</div>
       ) : (
         <div className={`current-player-display ${currentColor} ${isAITurn ? "ai-turn" : ""}`}>
           <h2>Current Player</h2>
