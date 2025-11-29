@@ -13,14 +13,14 @@ interface PathMap {
   [key: number]: PathMapEntry;
 }
 
-interface ChessPiece {
+export interface Piece {
   id: string;
   state: string;
   position: number;
 }
 
-interface PlayerPieces {
-  [key: string]: ChessPiece[];
+export interface PlayerPieces {
+  [key: string]: Piece[];
 }
 
 export interface FullGameState {

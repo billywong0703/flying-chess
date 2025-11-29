@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { gameEngine, fromFull } from "../engine/gameEngine";
 import { gameRules } from "../engine/gameRules";
 
-describe("遊戲邏輯測試", () => {
-  it("應正確轉換完整狀態到輕量狀態，包括位置、狀態、玩家等", () => {
+describe("Game Logic Tests", () => {
+  it("Should correctly convert full state to lightweight state, including position, state, player, etc.", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 1;
 
@@ -12,7 +12,7 @@ describe("遊戲邏輯測試", () => {
     expect(ls.player).toBe(1);
   });
 
-  it("在家區擲6應起飛到起始點", () => {
+  it("Rolling a 6 in home area should launch piece to starting point", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 0;
     fullState.consecutiveSixCount = 0;
@@ -25,7 +25,7 @@ describe("遊戲邏輯測試", () => {
     expect(ls.st[0]).toBe(1);
   });
 
-  it("連續三個6應懲罰，將跑道棋子飛回家並換下一玩家", () => {
+  it("Three consecutive 6s should trigger penalty, return track pieces to home and switch to next player", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 0; // red
     fullState.consecutiveSixCount = 2;
@@ -49,7 +49,7 @@ describe("遊戲邏輯測試", () => {
     expect(ls.player).toBe(1);
   });
 
-  it("連續三個6應懲罰，將跑道棋子飛回家並換下一玩家2", () => {
+  it("Three consecutive 6s should trigger penalty, return track pieces to home and switch to next player - version 2", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 0;
     fullState.consecutiveSixCount = 0;
@@ -79,7 +79,7 @@ describe("遊戲邏輯測試", () => {
     expect(ls.player).toBe(1);
   });
 
-  it("暢順進入家門", () => {
+  it("Should smoothly enter home stretch", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 3; // yellow
     fullState.consecutiveSixCount = 2;
@@ -94,11 +94,11 @@ describe("遊戲邏輯測試", () => {
     expect(ls.st[12]).toBe(2);
   });
 
-  it("暢順進入家門2", () => {
+  it("Should smoothly enter home stretch - version 2", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 3; // yellow
     fullState.consecutiveSixCount = 2;
-    // 修改一些棋子狀態
+    // Modify some piece states
     fullState.players.yellow[2] = { id: "yellow-2", state: "path", position: 63 };
     fullState.players.yellow[3] = { id: "yellow-3", state: "path", position: 63 };
 
@@ -112,7 +112,7 @@ describe("遊戲邏輯測試", () => {
     expect(ls.st[14]).toBe(1);
   });
 
-  it("家門通道移動應處剛好進終點", () => {
+  it("Moving in home stretch should reach finish line exactly", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 3; // red
     fullState.consecutiveSixCount = 2;
@@ -126,7 +126,7 @@ describe("遊戲邏輯測試", () => {
     expect(ls.st[13]).toBe(3);
   });
 
-  it("家門通道移動衝過頭要後退", () => {
+  it("Moving too far in home stretch should trigger backward movement", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 3; // red
     fullState.consecutiveSixCount = 2;
@@ -140,7 +140,7 @@ describe("遊戲邏輯測試", () => {
     expect(ls.st[13]).toBe(2);
   });
 
-  it("移動後應踢掉對手棋子回基地", () => {
+  it("Moving should knock opponent pieces back to base", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 0;
     fullState.consecutiveSixCount = 0;
@@ -159,7 +159,7 @@ describe("遊戲邏輯測試", () => {
     expect(ls.st[5]).toBe(0);
   });
 
-  it("四顆棋全到終點應設定贏家", () => {
+  it("Should set winner when all four pieces reach finish line", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 0;
     fullState.consecutiveSixCount = 0;
@@ -169,7 +169,7 @@ describe("遊戲邏輯測試", () => {
     fullState.players.red[3] = { id: "red-0", state: "goal-path", position: 72 };
 
     const ls = fromFull(fullState);
-    expect(ls.winner).toBe(-1); // 仍保持之前的值，但實際呼叫時是移動後檢查
+    expect(ls.winner).toBe(-1); // Should maintain previous value, but actually checked after move
 
     gameRules.roll(ls, 1);
     gameRules.move(ls, 3);
@@ -179,7 +179,7 @@ describe("遊戲邏輯測試", () => {
     expect(ls.winner).toBe(0);
   });
 
-  it("疊起的移動", () => {
+  it("Stacked pieces movement", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 0;
     fullState.consecutiveSixCount = 0;
@@ -200,7 +200,7 @@ describe("遊戲邏輯測試", () => {
     expect(ls.st[2]).toBe(1);
   });
 
-  it("在循環結尾的時候跳棋", () => {
+  it("Should jump at the end of cycle track", () => {
     const fullState = gameEngine.createInitialState();
     fullState.currentPlayer = 0;
     fullState.consecutiveSixCount = 0;

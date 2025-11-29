@@ -1,7 +1,13 @@
-import React from "react";
 import "./ActionLog.css";
 
-const ActionLog = ({ playerLog }) => {
+export interface Log {
+  id: number;
+  message: string;
+  type: string;
+  timestamp: string;
+}
+
+const ActionLog = ({ playerLog }: { playerLog: Log[] }) => {
   return (
     <div className="panel-section">
       <h3>📝 行動記錄</h3>

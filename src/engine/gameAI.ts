@@ -21,10 +21,9 @@ class GameAI {
 
   constructor() {
     this.iterations = 10000;
-    this.maxDepth = 400; // Maximum depth for random simulation
+    this.maxDepth = 400;
   }
 
-  // Public API: takes original complete state, returns original format action
   getBestMove(lightState: GameState): GameAction {
     // 1. Create root node (lightweight state)
     const rootNode = new MCTSNode(lightState);

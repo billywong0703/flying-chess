@@ -1,11 +1,16 @@
-import React from "react";
 import "./PlayerStatusGrid.css";
+import { PlayerPieces } from "./engine/gameEngine";
 
-const PlayerStatusGrid = ({ currentPlayer, playersChess, playerOrder }) => {
-  /**
-   * 🎯 獲取玩家狀態摘要
-   */
-  const getPlayerStatus = (color) => {
+interface PlayerStatusGridProps {
+  currentPlayer: number;
+  playersChess: PlayerPieces;
+  playerOrder: readonly string[];
+}
+
+const PlayerStatusGrid: React.FC<PlayerStatusGridProps> = ({ currentPlayer, playersChess, playerOrder }) => {
+  const currentColor = playerOrder[currentPlayer];
+
+  const getPlayerStatus = (color: string) => {
     const player = playersChess[color];
     const atHome = player.filter((chess) => chess.state === "home").length;
     const onPath = player.filter((chess) => chess.state === "path").length;
@@ -15,11 +20,9 @@ const PlayerStatusGrid = ({ currentPlayer, playersChess, playerOrder }) => {
     return { atHome, onPath, inGoalPath, atGoal };
   };
 
-  const currentColor = playerOrder[currentPlayer];
-
   return (
     <div className="panel-section">
-      <h3>📊 玩家狀態</h3>
+      <h3>📊 Player Status</h3>
       <div className="player-status-grid">
         {playerOrder.map((color) => {
           const status = getPlayerStatus(color);
@@ -27,10 +30,10 @@ const PlayerStatusGrid = ({ currentPlayer, playersChess, playerOrder }) => {
             <div key={color} className={`player-status ${color} ${color === currentColor ? "active" : ""}`}>
               <div className="player-color">{color}</div>
               <div className="status-details">
-                <span title="在家">🏠: {status.atHome}</span>
-                <span title="在跑道">🛣️: {status.onPath}</span>
-                <span title="在家門通道">🚪: {status.inGoalPath}</span>
-                <span title="在終點">🎯: {status.atGoal}</span>
+                <span title="At Home">🏠: {status.atHome}</span>
+                <span title="On Track">🛣️: {status.onPath}</span>
+                <span title="In Home Stretch">🚪: {status.inGoalPath}</span>
+                <span title="At Goal">🎯: {status.atGoal}</span>
               </div>
             </div>
           );

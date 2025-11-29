@@ -2,12 +2,12 @@ import { GameState } from "./gameRules";
 import { GameAction } from "./gameAI";
 
 class MCTSNode {
-  public gameState: GameState; // 🎮 Current game state
-  public parent: MCTSNode | null; // 👨‍👦 Parent node reference
-  public action: GameAction | null; // 🎯 Action that led to this node
-  public children: MCTSNode[]; // 🌱 Child node list
-  public visits: number; // 📊 Node visit count
-  public wins: number; // 🏆 Node win count/cumulative reward
+  public gameState: GameState; 
+  public parent: MCTSNode | null;
+  public action: GameAction | null; 
+  public children: MCTSNode[];
+  public visits: number;
+  public wins: number;
   public untriedActions: GameAction[] | null; // 📦 List of untried actions
 
   constructor(gameState: GameState, parent: MCTSNode | null = null, action: GameAction | null = null) {

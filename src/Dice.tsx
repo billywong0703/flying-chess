@@ -1,8 +1,12 @@
 import { useState } from "react";
 import "./Dice.css";
 
-// Dice.jsx
-const Dice = ({ onRoll, disabled = false }) => {
+interface DiceProps {
+  onRoll: (value: number) => void;
+  disabled?: boolean;
+}
+
+const Dice: React.FC<DiceProps> = ({ onRoll, disabled = false }) => {
   const [value, setValue] = useState(1);
   const [isRolling, setIsRolling] = useState(false);
 
@@ -10,7 +14,7 @@ const Dice = ({ onRoll, disabled = false }) => {
     if (isRolling || disabled) return;
 
     setIsRolling(true);
-    setValue(null);
+    setValue(-1);
 
     const interval = setInterval(() => {
       setValue(Math.floor(Math.random() * 6) + 1);
@@ -21,11 +25,11 @@ const Dice = ({ onRoll, disabled = false }) => {
       const finalValue = Math.floor(Math.random() * 6) + 1;
       setValue(finalValue);
       setIsRolling(false);
-      onRoll(finalValue); // 關鍵：通知父組件
+      onRoll(finalValue);
     }, 1000);
   };
 
-  const showDot = (positions) => positions.includes(value);
+  const showDot = (positions: number[]) => positions.includes(value);
 
   return (
     <div className="dice-container">

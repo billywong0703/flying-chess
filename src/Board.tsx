@@ -1,24 +1,16 @@
-// Board.tsx - TypeScript version
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./Board.css";
 import Chess from "./Chess";
 import Dice from "./Dice";
 import CurrentPlayerDisplay from "./CurrentPlayerDisplay";
 import PlayerStatusGrid from "./PlayerStatusGrid";
-import ActionLog from "./ActionLog";
+import ActionLog, { Log } from "./ActionLog";
 import VictoryScreen from "./VictoryScreen";
 import { gameEngine, PATH_MAP } from "./engine/gameEngine";
 import { GameAIWorkerAPI } from "./workers/gameAI.worker";
 import { wrap } from "comlink";
 
-interface LogEntry {
-  id: number;
-  message: string;
-  type: string;
-  timestamp: string;
-}
-
-interface ChessPieceProps {
+export interface ChessPieceProps {
   chess: {
     id: string;
     state: string;
@@ -30,7 +22,7 @@ interface ChessPieceProps {
   isAITurn: boolean;
 }
 
-const Board: React.FC = () => {
+const Board = () => {
   const aiWorkerRef = useRef<ReturnType<typeof wrap<GameAIWorkerAPI>> | null>(null);
 
   // 🎮 Game state
@@ -44,15 +36,15 @@ const Board: React.FC = () => {
   const [isAITurn, setIsAITurn] = useState(false);
 
   // 📝 Player info log
-  const [playerLog, setPlayerLog] = useState<LogEntry[]>([]);
+  const [playerLog, setPlayerLog] = useState<Log[]>([]);
   const logId = useRef(0);
 
   // 🎯 AI configuration - define which players are AI
   const aiPlayers = useRef<Record<string, boolean>>({
-    red: true, // Red player
+    red: true,
     yellow: true, // Yellow player
-    green: true, // Green player
-    blue: true, // Blue player
+    green: true,
+    blue: true,
   });
 
   // ===========================================================================
@@ -60,7 +52,7 @@ const Board: React.FC = () => {
   // ===========================================================================
 
   const addLog = (message: string, type: string = "info") => {
-    const newLog: LogEntry = {
+    const newLog: Log = {
       id: logId.current++,
       message,
       type,
@@ -88,10 +80,6 @@ const Board: React.FC = () => {
   // ===========================================================================
   // AI turn handling
   // ===========================================================================
-
-  /**
-   * 🤖 Handle AI turn
-   */
   const handleAITurn = useCallback(async () => {
     if (gameState.isGameOver || !isAITurn) return;
 
@@ -169,10 +157,6 @@ const Board: React.FC = () => {
   // ===========================================================================
   // Effect hooks
   // ===========================================================================
-
-  /**
-   * 🔄 Listen for game state changes, trigger AI turn
-   */
   useEffect(() => {
     if (gameState.isGameOver) return;
     if (aiPlayers.current[gameEngine.getPlayerColor(gameState.currentPlayer)]) {
