@@ -45,18 +45,18 @@ export const PATH_MAP: PathMap = {
   1: { x: 1, y: 3, type: "home-base", player: "red" },
   2: { x: 3, y: 1, type: "home-base", player: "red" },
   3: { x: 3, y: 3, type: "home-base", player: "red" },
-  4: { x: 13, y: 1, type: "home-base", player: "green" },
-  5: { x: 13, y: 3, type: "home-base", player: "green" },
-  6: { x: 15, y: 1, type: "home-base", player: "green" },
-  7: { x: 15, y: 3, type: "home-base", player: "green" },
-  8: { x: 1, y: 13, type: "home-base", player: "blue" },
-  9: { x: 1, y: 15, type: "home-base", player: "blue" },
-  10: { x: 3, y: 13, type: "home-base", player: "blue" },
-  11: { x: 3, y: 15, type: "home-base", player: "blue" },
-  12: { x: 13, y: 13, type: "home-base", player: "yellow" },
-  13: { x: 13, y: 15, type: "home-base", player: "yellow" },
-  14: { x: 15, y: 13, type: "home-base", player: "yellow" },
-  15: { x: 15, y: 15, type: "home-base", player: "yellow" },
+  4: { x: 1, y: 13, type: "home-base", player: "green" },
+  5: { x: 1, y: 15, type: "home-base", player: "green" },
+  6: { x: 3, y: 13, type: "home-base", player: "green" },
+  7: { x: 3, y: 15, type: "home-base", player: "green" },
+  8: { x: 13, y: 13, type: "home-base", player: "yellow" },
+  9: { x: 13, y: 15, type: "home-base", player: "yellow" },
+  10: { x: 15, y: 13, type: "home-base", player: "yellow" },
+  11: { x: 15, y: 15, type: "home-base", player: "yellow" },
+  12: { x: 13, y: 1, type: "home-base", player: "blue" },
+  13: { x: 13, y: 3, type: "home-base", player: "blue" },
+  14: { x: 15, y: 1, type: "home-base", player: "blue" },
+  15: { x: 15, y: 3, type: "home-base", player: "blue" },
 
   // 外圈跑道 (Outer track)
   16: { x: 2, y: 4, color: "red", type: "path" },
@@ -155,23 +155,23 @@ export function createInitialState(): FullGameState {
         { id: "red-2", state: "home", position: 2 },
         { id: "red-3", state: "home", position: 3 },
       ],
-      blue: [
-        { id: "blue-0", state: "home", position: 4 },
-        { id: "blue-1", state: "home", position: 5 },
-        { id: "blue-2", state: "home", position: 6 },
-        { id: "blue-3", state: "home", position: 7 },
-      ],
       green: [
-        { id: "green-0", state: "home", position: 8 },
-        { id: "green-1", state: "home", position: 9 },
-        { id: "green-2", state: "home", position: 10 },
-        { id: "green-3", state: "home", position: 11 },
+        { id: "green-0", state: "home", position: 4 },
+        { id: "green-1", state: "home", position: 5 },
+        { id: "green-2", state: "home", position: 6 },
+        { id: "green-3", state: "home", position: 7 },
       ],
       yellow: [
-        { id: "yellow-0", state: "home", position: 12 },
-        { id: "yellow-1", state: "home", position: 13 },
-        { id: "yellow-2", state: "home", position: 14 },
-        { id: "yellow-3", state: "home", position: 15 },
+        { id: "yellow-0", state: "home", position: 8 },
+        { id: "yellow-1", state: "home", position: 9 },
+        { id: "yellow-2", state: "home", position: 10 },
+        { id: "yellow-3", state: "home", position: 11 },
+      ],
+      blue: [
+        { id: "blue-0", state: "home", position: 12 },
+        { id: "blue-1", state: "home", position: 13 },
+        { id: "blue-2", state: "home", position: 14 },
+        { id: "blue-3", state: "home", position: 15 },
       ],
     },
     _movableChessIds: new Set<string>(),
@@ -306,9 +306,7 @@ export const gameEngine = {
   },
 
   cloneState(state: FullGameState): FullGameState {
-    // Deep clone the state
     const cloned = JSON.parse(JSON.stringify(state));
-    // Recreate the Set for movableChessIds since JSON.stringify loses Set information
     cloned._movableChessIds = new Set(state._movableChessIds);
     return cloned;
   },

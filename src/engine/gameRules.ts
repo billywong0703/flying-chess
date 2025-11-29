@@ -21,10 +21,10 @@ export class GameState {
 
 export const gameRules = {
   // Starting points, goal entry points, goal path starts for each color
-  PLAYER_COLOR: ["red", "blue", "green", "yellow"] as const,
-  START: [64, 51, 25, 38] as const,
-  GOAL_ENTRY: [60, 47, 21, 34] as const,
-  GOAL_PATH_START: [68, 86, 80, 74] as const,
+  PLAYER_COLOR: ["red", "green", "yellow", "blue"] as const,
+  START: [64, 25, 38, 51] as const,
+  GOAL_ENTRY: [60, 21, 34, 47] as const,
+  GOAL_PATH_START: [68, 80, 74, 86] as const,
   RING_SIZE: 52,
   RING_START: 16,
 

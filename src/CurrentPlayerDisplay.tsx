@@ -1,12 +1,13 @@
 import "./CurrentPlayerDisplay.css";
 import { PlayerPieces, Piece } from "./engine/gameEngine";
+import { PlayerSettings, PlayerColor } from "./Settings";
 
 interface CurrentPlayerDisplayProps {
   currentPlayer: number;
   playersChess: PlayerPieces;
   playerOrder: readonly string[];
   isAITurn: boolean;
-  aiPlayers: { [color: string]: boolean };
+  aiPlayers: PlayerSettings;
 }
 
 const CurrentPlayerDisplay: React.FC<CurrentPlayerDisplayProps> = ({ currentPlayer, playersChess, playerOrder, isAITurn, aiPlayers }) => {
@@ -25,7 +26,7 @@ const CurrentPlayerDisplay: React.FC<CurrentPlayerDisplayProps> = ({ currentPlay
 
   const winner = getWinner();
 
-  const isCurrentPlayerAI = aiPlayers && aiPlayers[currentColor];
+  const isCurrentPlayerAI = aiPlayers && aiPlayers[currentColor as PlayerColor];
 
   const playerDisplayName = isCurrentPlayerAI ? `🤖 ${currentColor} AI` : `👤 ${currentColor} Player`;
 

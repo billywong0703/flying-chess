@@ -10,11 +10,11 @@ export interface Log {
 const ActionLog = ({ playerLog }: { playerLog: Log[] }) => {
   return (
     <div className="panel-section">
-      <h3>📝 行動記錄</h3>
+      <h3>📝 Action Log</h3>
       <div className="action-log">
         {playerLog.length === 0 ? (
           <div className="log-entry info">
-            <span className="log-message">遊戲開始！請擲骰子</span>
+            <span className="log-message">game start</span>
           </div>
         ) : (
           playerLog.map((log) => (

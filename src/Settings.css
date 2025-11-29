@@ -1,0 +1,236 @@
+/* 添加到 Settings.css */
+.btn-save-changed {
+    background: #e74c3c !important;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(231, 76, 60, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+    }
+}
+
+/* Settings.css */
+.settings-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.settings-note {
+    margin: 0 0 16px 0;
+    color: #e74c3c;
+    font-size: 0.85rem;
+    font-style: italic;
+    padding: 8px;
+    background: #ffeaa7;
+    border-radius: 4px;
+    border-left: 3px solid #e74c3c;
+}
+
+.settings-modal {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.settings-modal h2 {
+    margin: 0 0 20px 0;
+    color: #333;
+    text-align: center;
+    font-size: 1.5rem;
+}
+
+.settings-section {
+    margin-bottom: 24px;
+}
+
+.settings-section h3 {
+    margin: 0 0 8px 0;
+    color: #555;
+    font-size: 1.1rem;
+}
+
+.settings-description {
+    margin: 0 0 16px 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.player-settings-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.player-card {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s ease;
+    background: #f8f9fa;
+}
+
+.player-card:hover {
+    border-color: #dee2e6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.player-card-red {
+    border-left: 4px solid #dc3545;
+}
+
+.player-card-yellow {
+    border-left: 4px solid #ffc107;
+}
+
+.player-card-green {
+    border-left: 4px solid #28a745;
+}
+
+.player-card-blue {
+    border-left: 4px solid #007bff;
+}
+
+.player-info {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.player-color-indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-right: 8px;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.player-color-indicator.red {
+    background-color: #dc3545;
+}
+
+.player-color-indicator.yellow {
+    background-color: #ffc107;
+}
+
+.player-color-indicator.green {
+    background-color: #28a745;
+}
+
+.player-color-indicator.blue {
+    background-color: #007bff;
+}
+
+.player-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.player-type-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.player-type-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.player-type-btn:hover {
+    border-color: #007bff;
+    background: #f8f9fa;
+}
+
+.player-type-btn.active {
+    border-color: #007bff;
+    background: #007bff;
+    color: white;
+    font-weight: 600;
+}
+
+.player-status {
+    text-align: center;
+    font-size: 0.85rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.settings-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e9ecef;
+}
+
+.btn-cancel,
+.btn-save {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-cancel {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-cancel:hover {
+    background: #5a6268;
+}
+
+.btn-save {
+    background: #007bff;
+    color: white;
+}
+
+.btn-save:hover {
+    background: #0056b3;
+}

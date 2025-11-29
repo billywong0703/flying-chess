@@ -81,7 +81,7 @@ describe("Game Logic Tests", () => {
 
   it("Should smoothly enter home stretch", () => {
     const fullState = gameEngine.createInitialState();
-    fullState.currentPlayer = 3; // yellow
+    fullState.currentPlayer = 2;
     fullState.consecutiveSixCount = 2;
     fullState.players.yellow[0] = { id: "yellow-0", state: "path", position: 34 };
 
@@ -90,17 +90,15 @@ describe("Game Logic Tests", () => {
     gameRules.move(ls, 0);
     console.log(ls);
 
-    expect(ls.pos[12]).toBe(76);
-    expect(ls.st[12]).toBe(2);
+    expect(ls.pos[8]).toBe(76);
+    expect(ls.st[8]).toBe(2);
   });
 
   it("Should smoothly enter home stretch - version 2", () => {
     const fullState = gameEngine.createInitialState();
-    fullState.currentPlayer = 3; // yellow
-    fullState.consecutiveSixCount = 2;
-    // Modify some piece states
-    fullState.players.yellow[2] = { id: "yellow-2", state: "path", position: 63 };
-    fullState.players.yellow[3] = { id: "yellow-3", state: "path", position: 63 };
+    fullState.currentPlayer = 2;
+    fullState.players.yellow[1] = { id: "yellow-2", state: "path", position: 31 };
+    fullState.players.yellow[2] = { id: "yellow-3", state: "path", position: 31 };
 
     const ls = fromFull(fullState);
     gameRules.roll(ls, 4);
@@ -108,15 +106,15 @@ describe("Game Logic Tests", () => {
     gameRules.move(ls, 2);
     console.log(ls);
 
-    expect(ls.pos[14]).toBe(19);
-    expect(ls.st[14]).toBe(1);
+    expect(ls.pos[10]).toBe(74);
+    expect(ls.st[10]).toBe(2);
   });
 
   it("Moving in home stretch should reach finish line exactly", () => {
     const fullState = gameEngine.createInitialState();
-    fullState.currentPlayer = 3; // red
+    fullState.currentPlayer = 3;
     fullState.consecutiveSixCount = 2;
-    fullState.players.yellow[1] = { id: "yellow-1", state: "goal-path", position: 75 };
+    fullState.players.blue[1] = { id: "blue-1", state: "goal-path", position: 87 };
 
     const ls = fromFull(fullState);
 
@@ -128,15 +126,15 @@ describe("Game Logic Tests", () => {
 
   it("Moving too far in home stretch should trigger backward movement", () => {
     const fullState = gameEngine.createInitialState();
-    fullState.currentPlayer = 3; // red
+    fullState.currentPlayer = 3;
     fullState.consecutiveSixCount = 2;
-    fullState.players.yellow[1] = { id: "yellow-1", state: "goal-path", position: 75 };
+    fullState.players.blue[1] = { id: "blue-1", state: "goal-path", position: 88 };
 
     const ls = fromFull(fullState);
 
     gameRules.roll(ls, 5);
     gameRules.move(ls, 1);
-    expect(ls.pos[13]).toBe(78);
+    expect(ls.pos[13]).toBe(89);
     expect(ls.st[13]).toBe(2);
   });
 
@@ -212,5 +210,19 @@ describe("Game Logic Tests", () => {
 
     expect(ls.pos[0]).toBe(16);
     expect(ls.st[0]).toBe(1);
+  });
+
+  it("Should jump", () => {
+    const fullState = gameEngine.createInitialState();
+    fullState.currentPlayer = 2;
+    fullState.consecutiveSixCount = 0;
+    fullState.players.yellow[0] = { id: "yellow-0", state: "path", position: 38 };
+
+    const ls = fromFull(fullState);
+    gameRules.roll(ls, 4);
+    gameRules.move(ls, 0);
+
+    expect(ls.pos[8]).toBe(46);
+    expect(ls.st[8]).toBe(1);
   });
 });

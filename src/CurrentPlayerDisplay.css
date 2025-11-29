@@ -1,5 +1,3 @@
-/* CurrentPlayerDisplay.css */
-/* 當前玩家區域 */
 .current-player-section {
     text-align: center;
 }
@@ -14,7 +12,6 @@
     overflow: hidden;
 }
 
-/* AI回合時的樣式 */
 .current-player-display.ai-turn {
     animation: aiPulse 2s infinite;
     border-style: dashed;
@@ -94,7 +91,6 @@
     min-height: 20px;
 }
 
-/* AI思考動畫 */
 .ai-thinking-dots {
     font-size: 24px;
     font-weight: bold;
@@ -160,7 +156,6 @@
     }
 }
 
-/* 響應式設計 */
 @media (max-width: 768px) {
     .current-player-display {
         padding: 15px;
